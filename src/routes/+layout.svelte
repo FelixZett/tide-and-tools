@@ -7,5 +7,10 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-<TopMenu />
-{@render children()}
+
+<div class="flex h-full flex-col">
+	<TopMenu />
+	<div class="flex-1 overflow-hidden">
+		{@render children()}
+	</div>
+</div>
