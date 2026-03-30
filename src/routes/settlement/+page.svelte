@@ -11,27 +11,84 @@
 		name: string;
 		category: FoodCategory;
 		baseDemandA: number;
+		icon: string;
 	};
 
 	type ServiceNeed = {
+		key: string;
 		name: string;
 		unit: string;
 		per1000: number;
 		enabled: boolean;
+		icon?: string;
 	};
 
+	const icon = {
+		food: '/settlement-icons/24px-FoodProduction.png',
+		electricity: '/settlement-icons/electricity.svg',
+		water: '/settlement-icons/water.svg',
+		wasteWater: '/settlement-icons/wastewater.svg',
+		householdGoods: '/settlement-icons/household-goods.svg',
+		waste: '/settlement-icons/24px-Waste.png',
+		biomass: '/settlement-icons/24px-Biomass.png',
+		recyclables: '/settlement-icons/24px-Recyclables.png',
+		computing: '/settlement-icons/24px-Computing.png',
+		consumerElectronics: '/settlement-icons/24px-ConsumerElectronics.png',
+		householdAppliances: '/settlement-icons/24px-HouseholdAppliances.png',
+		luxuryGoods: '/settlement-icons/24px-LuxuryGoods.png',
+		medical1: '/settlement-icons/24px-MedicalSupplies.png',
+		medical2: '/settlement-icons/24px-MedicalSupplies2.png',
+		medical3: '/settlement-icons/24px-MedicalSupplies3.png'
+	} as const;
+
 	const foods: FoodDef[] = [
-		{ key: 'potato', name: 'Potato', category: 'Carbs', baseDemandA: 4.2 },
-		{ key: 'corn', name: 'Corn', category: 'Carbs', baseDemandA: 3.0 },
-		{ key: 'bread', name: 'Bread', category: 'Carbs', baseDemandA: 2.0 },
-		{ key: 'meat', name: 'Meat', category: 'Protein', baseDemandA: 2.7 },
-		{ key: 'eggs', name: 'Eggs', category: 'Protein', baseDemandA: 3.0 },
-		{ key: 'tofu', name: 'Tofu', category: 'Protein', baseDemandA: 1.8 },
-		{ key: 'sausage', name: 'Sausage', category: 'Protein', baseDemandA: 3.35 },
-		{ key: 'vegetables', name: 'Vegetables', category: 'Vitamins', baseDemandA: 4.2 },
-		{ key: 'fruit', name: 'Fruit', category: 'Vitamins', baseDemandA: 3.15 },
-		{ key: 'snack', name: 'Snack', category: 'Treats', baseDemandA: 2.6 },
-		{ key: 'cake', name: 'Cake', category: 'Treats', baseDemandA: 2.5 }
+		{
+			key: 'potato',
+			name: 'Potato',
+			category: 'Carbs',
+			baseDemandA: 4.2,
+			icon: '/settlement-icons/24px-Potato.png'
+		},
+		{ key: 'corn', name: 'Corn', category: 'Carbs', baseDemandA: 3.0, icon: '/settlement-icons/24px-Corn.png' },
+		{
+			key: 'bread',
+			name: 'Bread',
+			category: 'Carbs',
+			baseDemandA: 2.0,
+			icon: '/settlement-icons/24px-Bread.png'
+		},
+		{ key: 'meat', name: 'Meat', category: 'Protein', baseDemandA: 2.7, icon: '/settlement-icons/24px-Meat.png' },
+		{ key: 'eggs', name: 'Eggs', category: 'Protein', baseDemandA: 3.0, icon: '/settlement-icons/24px-Eggs.png' },
+		{ key: 'tofu', name: 'Tofu', category: 'Protein', baseDemandA: 1.8, icon: '/settlement-icons/24px-Tofu.png' },
+		{
+			key: 'sausage',
+			name: 'Sausage',
+			category: 'Protein',
+			baseDemandA: 3.35,
+			icon: '/settlement-icons/24px-Sausage.png'
+		},
+		{
+			key: 'vegetables',
+			name: 'Vegetables',
+			category: 'Vitamins',
+			baseDemandA: 4.2,
+			icon: '/settlement-icons/24px-Vegetables.png'
+		},
+		{
+			key: 'fruit',
+			name: 'Fruit',
+			category: 'Vitamins',
+			baseDemandA: 3.15,
+			icon: '/settlement-icons/24px-Fruit.png'
+		},
+		{
+			key: 'snack',
+			name: 'Snack',
+			category: 'Treats',
+			baseDemandA: 2.6,
+			icon: '/settlement-icons/24px-Snack.png'
+		},
+		{ key: 'cake', name: 'Cake', category: 'Treats', baseDemandA: 2.5, icon: '/settlement-icons/24px-Cake.png' }
 	];
 
 	const tierDemandMultipliers: Record<
@@ -164,8 +221,10 @@
 	$: selectedFoods = foods.filter((f) => selectedFoodKeys.has(f.key));
 
 	$: foodNeedsPer1000PerMonth = selectedFoods.map((f) => ({
+		key: f.key,
 		name: f.name,
 		category: f.category,
+		icon: f.icon,
 		value: foodDemandPer1000PerMonth(f, selectedFoods, consumptionMultiplier)
 	}));
 
@@ -174,58 +233,83 @@
 	let serviceNeeds: ServiceNeed[] = [];
 	$: serviceNeeds = [
 		{
+			key: 'electricity',
 			name: 'Electricity',
 			unit: 'MW',
 			per1000: 1.1 * multipliers.electricity,
-			enabled: provideElectricity
+			enabled: provideElectricity,
+			icon: icon.electricity
 		},
 		{
+			key: 'water',
 			name: 'Water',
 			unit: '',
 			per1000: 47 * multipliers.water,
-			enabled: provideWater
+			enabled: provideWater,
+			icon: icon.water
 		},
 		{
+			key: 'wasteWater',
 			name: 'Waste Water removal',
 			unit: '',
 			per1000: 39.2 * multipliers.wasteWater,
-			enabled: provideWasteWaterRemoval
+			enabled: provideWasteWaterRemoval,
+			icon: icon.wasteWater
 		},
 		{
+			key: 'householdGoods',
 			name: 'Household Goods',
 			unit: '',
 			per1000: 10 * multipliers.householdGoods,
-			enabled: provideHouseholdGoods
+			enabled: provideHouseholdGoods,
+			icon: icon.householdGoods
 		},
 		{
+			key: 'householdAppliances',
 			name: 'Household Appliances',
 			unit: '',
 			per1000: 7 * multipliers.householdAppliances,
-			enabled: provideHouseholdAppliances
+			enabled: provideHouseholdAppliances,
+			icon: icon.householdAppliances
 		},
 		{
+			key: 'luxuryGoods',
 			name: 'Luxury Goods',
 			unit: '',
 			per1000: 3.6 * multipliers.luxuryGoods,
-			enabled: provideLuxuryGoods
+			enabled: provideLuxuryGoods,
+			icon: icon.luxuryGoods
 		},
 		{
+			key: 'consumerElectronics',
 			name: 'Consumer Electronics',
 			unit: '',
 			per1000: 3.6 * multipliers.consumerElectronics,
-			enabled: provideConsumerElectronics
+			enabled: provideConsumerElectronics,
+			icon: icon.consumerElectronics
 		},
 		{
+			key: 'medical',
 			name: 'Medical Supplies',
 			unit: '',
 			per1000: 5.0,
-			enabled: medicalLevel !== 'none'
+			enabled: medicalLevel !== 'none',
+			icon:
+				medicalLevel === 'medical1'
+					? icon.medical1
+					: medicalLevel === 'medical2'
+						? icon.medical2
+						: medicalLevel === 'medical3'
+							? icon.medical3
+							: undefined
 		},
 		{
+			key: 'computing',
 			name: 'Computing',
 			unit: '',
 			per1000: 57.6,
-			enabled: provideComputing
+			enabled: provideComputing,
+			icon: icon.computing
 		}
 	];
 
@@ -288,12 +372,21 @@
 </script>
 
 <div class="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-	<div>
-		<h1 class="text-3xl font-bold text-gray-900">Settlement Calculator</h1>
-		<p class="mt-2 text-gray-600">
-			Calculates service needs and waste-products for Captain of Industry settlements based on the
-			reference wiki data.
-		</p>
+	<div
+		class="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-amber-50 p-6 shadow-sm"
+	>
+		<img
+			src="/settlement-icons/360px-Population_Overview.png"
+			alt=""
+			class="pointer-events-none absolute -right-8 -top-16 hidden w-56 opacity-25 lg:block"
+		/>
+		<div class="relative">
+			<h1 class="text-3xl font-bold text-gray-900">Settlement Calculator</h1>
+			<p class="mt-2 max-w-2xl text-gray-600">
+				Calculates service needs and waste-products for Captain of Industry settlements based on the
+				reference wiki data.
+			</p>
+		</div>
 	</div>
 
 	<section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -333,7 +426,7 @@
 		</div>
 
 		<div class="mt-6 grid gap-6 lg:grid-cols-3">
-			<div>
+			<div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
 				<div class="flex items-center justify-between">
 					<h3 class="font-medium text-gray-900">Provided services</h3>
 					<div class="flex gap-3 text-xs">
@@ -351,31 +444,59 @@
 				</div>
 				<div class="mt-3 space-y-2 text-sm">
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideElectricity} />Electricity</label
+						><input type="checkbox" bind:checked={provideElectricity} /><img
+							src={icon.electricity}
+							alt=""
+							class="h-4 w-4"
+						/>Electricity</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideWater} />Water</label
+						><input type="checkbox" bind:checked={provideWater} /><img
+							src={icon.water}
+							alt=""
+							class="h-4 w-4"
+						/>Water</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideWasteWaterRemoval} />Waste Water removal</label
+						><input type="checkbox" bind:checked={provideWasteWaterRemoval} /><img
+							src={icon.wasteWater}
+							alt=""
+							class="h-4 w-4"
+						/>Waste Water removal</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideHouseholdGoods} />Household Goods</label
+						><input type="checkbox" bind:checked={provideHouseholdGoods} /><img
+							src={icon.householdGoods}
+							alt=""
+							class="h-4 w-4"
+						/>Household Goods</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideHouseholdAppliances} />Household Appliances</label
+						><input type="checkbox" bind:checked={provideHouseholdAppliances} /><img
+							src={icon.householdAppliances}
+							alt=""
+							class="h-4 w-4"
+						/>Household Appliances</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideLuxuryGoods} />Luxury Goods</label
+						><input type="checkbox" bind:checked={provideLuxuryGoods} /><img
+							src={icon.luxuryGoods}
+							alt=""
+							class="h-4 w-4"
+						/>Luxury Goods</label
 					>
 					<label class="flex items-center gap-2"
 						><input
 							type="checkbox"
 							bind:checked={provideConsumerElectronics}
-						/>Consumer Electronics</label
+						/><img src={icon.consumerElectronics} alt="" class="h-4 w-4" />Consumer Electronics</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={provideComputing} />Computing</label
+						><input type="checkbox" bind:checked={provideComputing} /><img
+							src={icon.computing}
+							alt=""
+							class="h-4 w-4"
+						/>Computing</label
 					>
 					<label class="flex items-center gap-2">
 						<span>Medical</span>
@@ -389,19 +510,27 @@
 				</div>
 			</div>
 
-			<div>
+			<div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
 				<h3 class="font-medium text-gray-900">Connected collection</h3>
 				<div class="mt-3 space-y-2 text-sm">
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={collectBiomass} />Biomass Collection</label
+						><input type="checkbox" bind:checked={collectBiomass} /><img
+							src={icon.biomass}
+							alt=""
+							class="h-4 w-4"
+						/>Biomass Collection</label
 					>
 					<label class="flex items-center gap-2"
-						><input type="checkbox" bind:checked={collectRecyclables} />Recyclables Collection</label
+						><input type="checkbox" bind:checked={collectRecyclables} /><img
+							src={icon.recyclables}
+							alt=""
+							class="h-4 w-4"
+						/>Recyclables Collection</label
 					>
 				</div>
 			</div>
 
-			<div>
+			<div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
 				<div class="flex items-center justify-between">
 					<h3 class="font-medium text-gray-900">Provided food types</h3>
 					<div class="flex gap-3 text-xs">
@@ -425,6 +554,7 @@
 								checked={selectedFoodKeys.has(food.key)}
 								onchange={() => toggleFood(food.key)}
 							/>
+							<img src={food.icon} alt="" class="h-4 w-4" />
 							<span>{food.name}</span>
 						</label>
 					{/each}
@@ -435,7 +565,9 @@
 
 	<section class="grid gap-6 lg:grid-cols-2">
 		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-			<h2 class="text-xl font-semibold text-gray-900">Needs</h2>
+			<h2 class="flex items-center gap-2 text-xl font-semibold text-gray-900">
+				<img src={icon.food} alt="" class="h-5 w-5" />Needs
+			</h2>
 			<p class="mt-1 text-sm text-gray-600">Demand values are per 60s for the configured population.</p>
 			<div class="mt-4 overflow-x-auto">
 				<table class="min-w-full text-sm">
@@ -449,7 +581,16 @@
 					<tbody>
 						{#each serviceNeeds.filter((s) => s.enabled) as s}
 							<tr class="border-b border-gray-100">
-								<td class="py-2 pr-4">{s.name}</td>
+								<td class="py-2 pr-4">
+									<div class="flex items-center gap-2">
+										{#if s.icon}
+											<img src={s.icon} alt="" class="h-4 w-4" />
+										{:else}
+											<span class="h-2 w-2 rounded-full bg-slate-400"></span>
+										{/if}
+										<span>{s.name}</span>
+									</div>
+								</td>
 								<td class="py-2 pr-4">{roundTo(s.per1000, 3)} {s.unit}</td>
 								<td class="py-2">{roundTo(s.per1000 * popScale, 3)} {s.unit}</td>
 							</tr>
@@ -460,7 +601,9 @@
 		</div>
 
 		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-			<h2 class="text-xl font-semibold text-gray-900">Food demand</h2>
+			<h2 class="flex items-center gap-2 text-xl font-semibold text-gray-900">
+				<img src={icon.food} alt="" class="h-5 w-5" />Food demand
+			</h2>
 			<p class="mt-1 text-sm text-gray-600">
 				Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, shown per month.
 			</p>
@@ -476,7 +619,12 @@
 					<tbody>
 						{#each foodNeedsPer1000PerMonth as f}
 							<tr class="border-b border-gray-100">
-								<td class="py-2 pr-4">{f.name}</td>
+								<td class="py-2 pr-4">
+									<div class="flex items-center gap-2">
+										<img src={f.icon} alt="" class="h-4 w-4" />
+										<span>{f.name}</span>
+									</div>
+								</td>
 								<td class="py-2 pr-4">{f.category}</td>
 								<td class="py-2">{roundTo(f.value * popScale, 2)}</td>
 							</tr>
@@ -494,7 +642,9 @@
 
 	<section>
 		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-			<h2 class="text-xl font-semibold text-gray-900">Waste-Products</h2>
+			<h2 class="flex items-center gap-2 text-xl font-semibold text-gray-900">
+				<img src={icon.waste} alt="" class="h-5 w-5" />Waste-Products
+			</h2>
 			<p class="mt-1 text-sm text-gray-600">
 				Outputs are per 60s for the configured population.
 				{#if selectedFoods.length > 0 && selectedFoods.length < foods.length}
@@ -513,17 +663,32 @@
 					</thead>
 					<tbody>
 						<tr class="border-b border-gray-100">
-							<td class="py-2 pr-4">Waste</td>
+							<td class="py-2 pr-4">
+								<div class="flex items-center gap-2">
+									<img src={icon.waste} alt="" class="h-4 w-4" />
+									<span>Waste</span>
+								</div>
+							</td>
 							<td class="py-2 pr-4">{formatRange(effectiveWastePer1000, 3)}</td>
 							<td class="py-2">{formatRange(totalWaste, 3)}</td>
 						</tr>
 						<tr class="border-b border-gray-100">
-							<td class="py-2 pr-4">Biomass</td>
+							<td class="py-2 pr-4">
+								<div class="flex items-center gap-2">
+									<img src={icon.biomass} alt="" class="h-4 w-4" />
+									<span>Biomass</span>
+								</div>
+							</td>
 							<td class="py-2 pr-4">{formatRange(effectiveBiomassPer1000, 3)}</td>
 							<td class="py-2">{formatRange(totalBiomass, 3)}</td>
 						</tr>
 						<tr>
-							<td class="py-2 pr-4">Recyclables</td>
+							<td class="py-2 pr-4">
+								<div class="flex items-center gap-2">
+									<img src={icon.recyclables} alt="" class="h-4 w-4" />
+									<span>Recyclables</span>
+								</div>
+							</td>
 							<td class="py-2 pr-4">{roundTo(effectiveRecyclablesPer1000, 3)}</td>
 							<td class="py-2">{roundTo(totalRecyclables.min, 3)}</td>
 						</tr>
