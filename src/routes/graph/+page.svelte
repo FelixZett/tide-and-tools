@@ -5,6 +5,58 @@
 	let svgElement: SVGSVGElement;
 
 	onMount(() => {
+		const NODE_RADIUS = 20;
+		const LABEL_MAX_CHARS_PER_LINE = 7;
+		const LABEL_MAX_LINES = 2;
+
+		function buildLabelLines(label: string, maxCharsPerLine: number, maxLines: number): string[] {
+			const words = label.trim().split(/\s+/).filter(Boolean);
+			const lines: string[] = [];
+			let currentLine = '';
+
+			const pushWord = (word: string) => {
+				while (word.length > maxCharsPerLine) {
+					if (lines.length >= maxLines) return false;
+					lines.push(word.slice(0, maxCharsPerLine - 1) + '-');
+					word = word.slice(maxCharsPerLine - 1);
+				}
+				const candidate = currentLine ? `${currentLine} ${word}` : word;
+				if (candidate.length <= maxCharsPerLine) {
+					currentLine = candidate;
+				} else {
+					if (lines.length >= maxLines) return false;
+					lines.push(currentLine);
+					currentLine = word;
+				}
+				return true;
+			};
+
+			for (const word of words) {
+				if (!pushWord(word)) break;
+			}
+
+			if (currentLine && lines.length < maxLines) {
+				lines.push(currentLine);
+			}
+
+			if (lines.length === 0) {
+				return [''];
+			}
+
+			const sourceWords = words.join(' ');
+			const shownWords = lines.join(' ');
+			if (sourceWords.length > shownWords.length) {
+				const lastIndex = lines.length - 1;
+				const lastLine = lines[lastIndex];
+				lines[lastIndex] =
+					lastLine.length >= maxCharsPerLine
+						? `${lastLine.slice(0, maxCharsPerLine - 1)}…`
+						: `${lastLine}…`;
+			}
+
+			return lines.slice(0, maxLines);
+		}
+
 		// Define nodes
 		const nodes = [
 			{ id: 'Node 1', x: 100, y: 100 },
@@ -19,7 +71,10 @@
 			{ id: 'Node 10', x: 50, y: 200 },
 			{ id: 'Node 11', x: 500, y: 150 },
 			{ id: 'Node 12', x: 300, y: 50 }
-		];
+		].map((node, _) => ({
+			...node,
+			labelLines: buildLabelLines(node.id, LABEL_MAX_CHARS_PER_LINE, LABEL_MAX_LINES)
+		}));
 
 		// Define links between nodes - create a well-connected network
 		const links = [
@@ -64,7 +119,6 @@
 
 		// Create a group for transforming
 		const g = svg.append('g');
-
 		// Create links
 		const link = g
 			.selectAll('line')
@@ -79,7 +133,7 @@
 			.selectAll('circle')
 			.data(nodes)
 			.join('circle')
-			.attr('r', 20)
+			.attr('r', NODE_RADIUS)
 			.attr('fill', '#4f46e5')
 			.attr('stroke', '#fff')
 			.attr('stroke-width', 2)
@@ -91,11 +145,28 @@
 			.data(nodes)
 			.join('text')
 			.attr('text-anchor', 'middle')
-			.attr('dy', '.35em')
+			.attr('dominant-baseline', 'middle')
 			.attr('fill', '#fff')
 			.attr('font-weight', 'bold')
+			.attr('font-size', 10)
 			.attr('pointer-events', 'none')
-			.text((d: any) => d.id);
+			.each(function (this: SVGTextElement, d: any) {
+				const text = d3.select(this);
+				const lines = d.labelLines;
+				const lineHeightEm = 1.1;
+				const startDy = -((lines.length - 1) * lineHeightEm) / 2;
+
+				text
+					.selectAll('tspan')
+					.data(lines)
+					.join('tspan')
+					.attr('dy', (_line: string, i: number) =>
+						i === 0 ? `${startDy}em` : `${lineHeightEm}em`
+					)
+					.text((line: string) => line);
+			});
+
+		label.append('title').text((d: any) => d.id);
 
 		// Update positions on each tick
 		simulation.on('tick', () => {
