@@ -306,7 +306,7 @@
 		{
 			key: 'computing',
 			name: 'Computing',
-			unit: '',
+			unit: 'TF',
 			per1000: 57.6,
 			enabled: provideComputing,
 			icon: icon.computing
