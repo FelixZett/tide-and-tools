@@ -126,7 +126,27 @@
 		selectedFoodKeys = new Set(selectedFoodKeys);
 	}
 
-	function foodDemandPer1000Per60(food: FoodDef, selectedFoods: FoodDef[]): number {
+	function setAllFoods(enabled: boolean): void {
+		selectedFoodKeys = enabled ? new Set(foods.map((f) => f.key)) : new Set<string>();
+	}
+
+	function setAllServices(enabled: boolean): void {
+		provideElectricity = enabled;
+		provideWater = enabled;
+		provideWasteWaterRemoval = enabled;
+		provideHouseholdGoods = enabled;
+		provideHouseholdAppliances = enabled;
+		provideLuxuryGoods = enabled;
+		provideConsumerElectronics = enabled;
+		provideComputing = enabled;
+		medicalLevel = enabled ? 'medical3' : 'none';
+	}
+
+	function foodDemandPer1000PerMonth(
+		food: FoodDef,
+		selectedFoods: FoodDef[],
+		foodMultiplier: number
+	): number {
 		const categoryCounts = new Map<FoodCategory, number>();
 		for (const f of selectedFoods) {
 			categoryCounts.set(f.category, (categoryCounts.get(f.category) ?? 0) + 1);
@@ -134,11 +154,8 @@
 
 		const activeCategories = categoryCounts.size;
 		const inCategory = categoryCounts.get(food.category) ?? 1;
-		const per100PerMonth = (food.baseDemandA / (activeCategories * inCategory)) * consumptionMultiplier;
-		const per1000PerMonth = per100PerMonth * 10;
-
-		// COI month is 30 days -> 30 * 24 = 720 in-game 60-second ticks.
-		return per1000PerMonth / 720;
+		const per100PerMonth = (food.baseDemandA / (activeCategories * inCategory)) * foodMultiplier;
+		return per100PerMonth * 10;
 	}
 
 	$: popScale = Math.max(0, population) / 1000;
@@ -146,13 +163,13 @@
 
 	$: selectedFoods = foods.filter((f) => selectedFoodKeys.has(f.key));
 
-	$: foodNeedsPer1000Per60 = selectedFoods.map((f) => ({
+	$: foodNeedsPer1000PerMonth = selectedFoods.map((f) => ({
 		name: f.name,
 		category: f.category,
-		value: foodDemandPer1000Per60(f, selectedFoods)
+		value: foodDemandPer1000PerMonth(f, selectedFoods, consumptionMultiplier)
 	}));
 
-	$: foodNeedsTotalPer1000Per60 = foodNeedsPer1000Per60.reduce((sum, f) => sum + f.value, 0);
+	$: foodNeedsTotalPer1000PerMonth = foodNeedsPer1000PerMonth.reduce((sum, f) => sum + f.value, 0);
 
 	let serviceNeeds: ServiceNeed[] = [];
 	$: serviceNeeds = [
@@ -220,6 +237,7 @@
 			: selectedFoods.length === foods.length
 				? { min: 4.1, max: 4.1 }
 				: { min: 1.3, max: 6.4 };
+	$: foodBiomassPer1000 = scaleRange(foodBiomassPer1000, consumptionMultiplier);
 
 	$: householdGoodsBiomassPer1000 = provideHouseholdGoods ? 4.3 : 0;
 	$: householdGoodsRecyclablesPer1000 = provideHouseholdGoods ? 6.8 : 0;
@@ -316,7 +334,21 @@
 
 		<div class="mt-6 grid gap-6 lg:grid-cols-3">
 			<div>
-				<h3 class="font-medium text-gray-900">Provided services</h3>
+				<div class="flex items-center justify-between">
+					<h3 class="font-medium text-gray-900">Provided services</h3>
+					<div class="flex gap-3 text-xs">
+						<button
+							type="button"
+							class="text-blue-600 underline-offset-2 hover:underline"
+							onclick={() => setAllServices(true)}>all on</button
+						>
+						<button
+							type="button"
+							class="text-blue-600 underline-offset-2 hover:underline"
+							onclick={() => setAllServices(false)}>all off</button
+						>
+					</div>
+				</div>
 				<div class="mt-3 space-y-2 text-sm">
 					<label class="flex items-center gap-2"
 						><input type="checkbox" bind:checked={provideElectricity} />Electricity</label
@@ -370,7 +402,21 @@
 			</div>
 
 			<div>
-				<h3 class="font-medium text-gray-900">Provided food types</h3>
+				<div class="flex items-center justify-between">
+					<h3 class="font-medium text-gray-900">Provided food types</h3>
+					<div class="flex gap-3 text-xs">
+						<button
+							type="button"
+							class="text-blue-600 underline-offset-2 hover:underline"
+							onclick={() => setAllFoods(true)}>all on</button
+						>
+						<button
+							type="button"
+							class="text-blue-600 underline-offset-2 hover:underline"
+							onclick={() => setAllFoods(false)}>all off</button
+						>
+					</div>
+				</div>
 				<div class="mt-3 grid grid-cols-2 gap-2 text-sm">
 					{#each foods as food}
 						<label class="flex items-center gap-2">
@@ -416,7 +462,7 @@
 		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
 			<h2 class="text-xl font-semibold text-gray-900">Food demand</h2>
 			<p class="mt-1 text-sm text-gray-600">
-				Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, converted to per 60s.
+				Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, shown per month.
 			</p>
 			<div class="mt-3 overflow-x-auto">
 				<table class="min-w-full text-sm">
@@ -424,21 +470,21 @@
 						<tr class="border-b text-left text-gray-600">
 							<th class="py-2 pr-4">Food</th>
 							<th class="py-2 pr-4">Category</th>
-							<th class="py-2">Total / 60s</th>
+							<th class="py-2">Total / month</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each foodNeedsPer1000Per60 as f}
+						{#each foodNeedsPer1000PerMonth as f}
 							<tr class="border-b border-gray-100">
 								<td class="py-2 pr-4">{f.name}</td>
 								<td class="py-2 pr-4">{f.category}</td>
-								<td class="py-2">{roundTo(f.value * popScale, 4)}</td>
+								<td class="py-2">{roundTo(f.value * popScale, 2)}</td>
 							</tr>
 						{/each}
 						<tr class="font-semibold">
 							<td class="py-2 pr-4">Total Food</td>
 							<td class="py-2 pr-4">-</td>
-							<td class="py-2">{roundTo(foodNeedsTotalPer1000Per60 * popScale, 4)}</td>
+							<td class="py-2">{roundTo(foodNeedsTotalPer1000PerMonth * popScale, 2)}</td>
 						</tr>
 					</tbody>
 				</table>
