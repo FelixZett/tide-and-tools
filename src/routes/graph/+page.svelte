@@ -119,6 +119,22 @@
 
 		// Create a group for transforming
 		const g = svg.append('g');
+
+		const zoom = d3
+			.zoom<SVGSVGElement, unknown>()
+			.scaleExtent([0.25, 4])
+			.filter((event: any) => {
+				if (event.type === 'wheel') return true;
+				if (event.type === 'mousedown') {
+					return event.button === 0 && event.target === svgElement;
+				}
+				return !event.button;
+			})
+			.on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+				g.attr('transform', event.transform.toString());
+			});
+
+		svg.call(zoom).on('dblclick.zoom', null);
 		// Create links
 		const link = g
 			.selectAll('line')
@@ -210,6 +226,6 @@
 		<h1 class="text-3xl font-bold text-gray-900">Force Directed Graph</h1>
 	</div>
 	<div class="flex-1 overflow-hidden border-t border-gray-300 bg-gray-50">
-		<svg bind:this={svgElement} class="h-full w-full" />
+		<svg bind:this={svgElement} class="h-full w-full cursor-grab active:cursor-grabbing" />
 	</div>
 </div>
