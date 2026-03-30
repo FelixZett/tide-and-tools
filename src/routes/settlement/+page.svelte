@@ -411,40 +411,42 @@
 					</tbody>
 				</table>
 			</div>
-
-			<div class="mt-6">
-				<h3 class="font-medium text-gray-900">Food demand</h3>
-				<p class="mt-1 text-sm text-gray-600">
-					Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, converted to per 60s.
-				</p>
-				<div class="mt-3 overflow-x-auto">
-					<table class="min-w-full text-sm">
-						<thead>
-							<tr class="border-b text-left text-gray-600">
-								<th class="py-2 pr-4">Food</th>
-								<th class="py-2 pr-4">Category</th>
-								<th class="py-2">Total / 60s</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each foodNeedsPer1000Per60 as f}
-								<tr class="border-b border-gray-100">
-									<td class="py-2 pr-4">{f.name}</td>
-									<td class="py-2 pr-4">{f.category}</td>
-									<td class="py-2">{roundTo(f.value * popScale, 4)}</td>
-								</tr>
-							{/each}
-							<tr class="font-semibold">
-								<td class="py-2 pr-4">Total Food</td>
-								<td class="py-2 pr-4">-</td>
-								<td class="py-2">{roundTo(foodNeedsTotalPer1000Per60 * popScale, 4)}</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-			</div>
 		</div>
 
+		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+			<h2 class="text-xl font-semibold text-gray-900">Food demand</h2>
+			<p class="mt-1 text-sm text-gray-600">
+				Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, converted to per 60s.
+			</p>
+			<div class="mt-3 overflow-x-auto">
+				<table class="min-w-full text-sm">
+					<thead>
+						<tr class="border-b text-left text-gray-600">
+							<th class="py-2 pr-4">Food</th>
+							<th class="py-2 pr-4">Category</th>
+							<th class="py-2">Total / 60s</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each foodNeedsPer1000Per60 as f}
+							<tr class="border-b border-gray-100">
+								<td class="py-2 pr-4">{f.name}</td>
+								<td class="py-2 pr-4">{f.category}</td>
+								<td class="py-2">{roundTo(f.value * popScale, 4)}</td>
+							</tr>
+						{/each}
+						<tr class="font-semibold">
+							<td class="py-2 pr-4">Total Food</td>
+							<td class="py-2 pr-4">-</td>
+							<td class="py-2">{roundTo(foodNeedsTotalPer1000Per60 * popScale, 4)}</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</section>
+
+	<section>
 		<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
 			<h2 class="text-xl font-semibold text-gray-900">Waste-Products</h2>
 			<p class="mt-1 text-sm text-gray-600">

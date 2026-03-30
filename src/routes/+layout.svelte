@@ -10,7 +10,7 @@
 
 <div class="flex h-full flex-col">
 	<TopMenu />
-	<div class="flex-1 overflow-hidden">
+	<div class="flex-1 overflow-auto">
 		{@render children()}
 	</div>
 </div>
