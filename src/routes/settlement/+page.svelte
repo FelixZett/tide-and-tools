@@ -382,171 +382,143 @@
 	);
 </script>
 
-<div class="settlement-page mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-	<div class="settlement-hero">
-		<div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.28),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.14),transparent_35%)]"></div>
-		<div class="pointer-events-none absolute -right-6 -top-8 hidden lg:block">
-			<div class="grid gap-3 rounded-3xl border border-white/40 bg-white/65 p-4 shadow-xl backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-950/55">
-				<img src={getProductIconHref('product_food_pack')} alt="" class="h-12 w-12 rounded-2xl bg-white p-2 shadow-sm dark:bg-slate-900" />
-				<img
-					src={getProductIconHref('product_virtual_electricity')}
-					alt=""
-					class="h-12 w-12 rounded-2xl bg-white p-2 shadow-sm dark:bg-slate-900"
-				/>
-				<img src={getProductIconHref('product_waste_water')} alt="" class="h-12 w-12 rounded-2xl bg-white p-2 shadow-sm dark:bg-slate-900" />
+<div class="mx-auto flex min-h-[80vh] max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
+	<header class="relative overflow-hidden rounded-[2rem] border border-base-200 bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/10 p-6 shadow-xl shadow-primary/40">
+		<div class="space-y-2">
+			<p class="text-xs uppercase tracking-[0.42em] text-primary/70">Settlement planner</p>
+			<h1 class="text-3xl font-semibold text-base-content">Settlement Calculator</h1>
+			<p class="text-base-content/70">
+				Estimate service, food, and waste requirements from housing units and tier multipliers. Housing
+				capacity determines the population behind every calculation.
+			</p>
+		</div>
+		<div class="mt-6 grid gap-3 sm:grid-cols-3">
+			<div class="rounded-2xl border border-base-200/70 bg-base-100/60 p-4 shadow-sm">
+				<p class="text-xs uppercase tracking-[0.32em] text-base-content/60">Population</p>
+				<p class="text-2xl font-semibold text-base-content">{roundTo(estimatedPopulation, 0)}</p>
+				<p class="text-xs text-base-content/60">Based on {roundTo(housingUnits, 0)} units</p>
+			</div>
+			<div class="rounded-2xl border border-base-200/70 bg-base-100/60 p-4 shadow-sm">
+				<p class="text-xs uppercase tracking-[0.32em] text-base-content/60">Tier capacity</p>
+				<p class="text-lg font-semibold text-base-content">{housingCapacity} people / unit</p>
+				<p class="text-xs text-base-content/60">Tier {housingTier}</p>
+			</div>
+			<div class="rounded-2xl border border-base-200/70 bg-base-100/60 p-4 shadow-sm">
+				<p class="text-xs uppercase tracking-[0.32em] text-base-content/60">Food multiplier</p>
+				<p class="text-lg font-semibold text-base-content">{roundTo(consumptionMultiplier, 2)}×</p>
+				<p class="text-xs text-base-content/60">Affects biomass calculations</p>
 			</div>
 		</div>
+	</header>
 
-		<div class="relative grid gap-6 p-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,0.9fr)] lg:p-8">
-			<div class="space-y-4">
-				<div class="inline-flex items-center gap-2 rounded-full border border-[color:var(--settlement-border)] bg-[color:var(--settlement-pill)] px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">
-					Settlement planner
-				</div>
-				<div class="space-y-3">
-					<h1 class="max-w-2xl text-3xl font-bold tracking-tight text-[color:var(--settlement-text)] sm:text-4xl">
-						Settlement Calculator
-					</h1>
-					<p class="max-w-2xl text-sm leading-6 text-[color:var(--settlement-muted)] sm:text-base">
-						Calculate service demand, food demand, and waste products for Captain of Industry settlements.
-						Population is derived from housing units and housing tier.
-					</p>
-				</div>
+	<section class="card bg-base-100/70 shadow-xl">
+		<div class="card-body space-y-6">
+			<div class="grid gap-4 md:grid-cols-3">
+				<label class="flex flex-col gap-2 text-sm text-base-content/60">
+					<span>Housing units</span>
+					<input
+						type="number"
+						min="0"
+						step="1"
+						class="input input-bordered input-primary bg-base-100"
+						bind:value={housingUnits}
+					/>
+				</label>
+				<label class="flex flex-col gap-2 text-sm text-base-content/60">
+					<span>Housing tier</span>
+					<select class="select select-bordered bg-base-100 text-base-content" bind:value={housingTier}>
+						<option value="I">I</option>
+						<option value="II">II</option>
+						<option value="III">III</option>
+						<option value="IV">IV</option>
+					</select>
+				</label>
+				<label class="flex flex-col gap-2 text-sm text-base-content/60">
+					<span>Food consumption multiplier</span>
+					<input
+						type="number"
+						min="0"
+						step="0.05"
+						class="input input-bordered input-primary bg-base-100"
+						bind:value={consumptionMultiplier}
+					/>
+				</label>
 			</div>
-
-			<div class="settlement-panel grid gap-3 p-4">
-				<div class="flex items-baseline justify-between gap-3">
-					<span class="text-sm font-medium text-[color:var(--settlement-muted)]">Estimated population</span>
-					<span class="text-xs uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">From housing</span>
+			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				<div class="stat rounded-2xl border border-base-200/70 bg-base-200/40 p-4">
+					<div class="stat-title text-xs uppercase tracking-[0.32em] text-base-content/60">Housing I</div>
+					<div class="stat-value text-lg font-semibold text-base-content">80 people / unit</div>
 				</div>
-				<div class="text-4xl font-semibold tracking-tight text-[color:var(--settlement-text)]">
-					{roundTo(estimatedPopulation, 0)}
+				<div class="stat rounded-2xl border border-base-200/70 bg-base-200/40 p-4">
+					<div class="stat-title text-xs uppercase tracking-[0.32em] text-base-content/60">Housing II</div>
+					<div class="stat-value text-lg font-semibold text-base-content">140 people / unit</div>
 				</div>
-				<div class="flex flex-wrap gap-2 text-sm text-[color:var(--settlement-muted)]">
-					<span class="rounded-full border border-[color:var(--settlement-border)] bg-[color:var(--settlement-chip)] px-3 py-1">
-						{roundTo(housingUnits, 0)} housing units
-					</span>
-					<span class="rounded-full border border-[color:var(--settlement-border)] bg-[color:var(--settlement-chip)] px-3 py-1">
-						Tier {housingTier} x {housingCapacity} people
-					</span>
+				<div class="stat rounded-2xl border border-base-200/70 bg-base-200/40 p-4">
+					<div class="stat-title text-xs uppercase tracking-[0.32em] text-base-content/60">Housing III</div>
+					<div class="stat-value text-lg font-semibold text-base-content">240 people / unit</div>
+				</div>
+				<div class="stat rounded-2xl border border-base-200/70 bg-base-200/40 p-4">
+					<div class="stat-title text-xs uppercase tracking-[0.32em] text-base-content/60">Housing IV</div>
+					<div class="stat-value text-lg font-semibold text-base-content">400 people / unit</div>
 				</div>
 			</div>
 		</div>
-	</div>
+	</section>
 
-	<section class="settlement-panel p-5 sm:p-6">
-		<h2 class="text-xl font-semibold text-[color:var(--settlement-text)]">Inputs</h2>
-		<p class="mt-1 text-sm text-[color:var(--settlement-muted)]">
-			Set housing units first, then choose the housing tier used for the capacity and demand multipliers.
-		</p>
-		<div class="mt-5 grid gap-4 md:grid-cols-3">
-			<label class="flex flex-col gap-2 text-sm text-[color:var(--settlement-muted)]">
-				<span>Housing units</span>
-				<input
-					type="number"
-					min="0"
-					step="1"
-					class="settlement-input"
-					bind:value={housingUnits}
-				/>
-			</label>
-
-			<label class="flex flex-col gap-2 text-sm text-[color:var(--settlement-muted)]">
-				<span>Housing Tier</span>
-				<select class="settlement-input" bind:value={housingTier}>
-					<option value="I">I</option>
-					<option value="II">II</option>
-					<option value="III">III</option>
-					<option value="IV">IV</option>
-				</select>
-			</label>
-
-			<label class="flex flex-col gap-2 text-sm text-[color:var(--settlement-muted)]">
-				<span>Food consumption multiplier</span>
-				<input
-					type="number"
-					min="0"
-					step="0.05"
-					class="settlement-input"
-					bind:value={consumptionMultiplier}
-				/>
-			</label>
-		</div>
-
-		<div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-			<div class="settlement-kpi">
-				<div class="text-xs uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">Housing I</div>
-				<div class="mt-2 text-lg font-semibold text-[color:var(--settlement-text)]">80 people / unit</div>
-			</div>
-			<div class="settlement-kpi">
-				<div class="text-xs uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">Housing II</div>
-				<div class="mt-2 text-lg font-semibold text-[color:var(--settlement-text)]">140 people / unit</div>
-			</div>
-			<div class="settlement-kpi">
-				<div class="text-xs uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">Housing III</div>
-				<div class="mt-2 text-lg font-semibold text-[color:var(--settlement-text)]">240 people / unit</div>
-			</div>
-			<div class="settlement-kpi">
-				<div class="text-xs uppercase tracking-[0.18em] text-[color:var(--settlement-muted)]">Housing IV</div>
-				<div class="mt-2 text-lg font-semibold text-[color:var(--settlement-text)]">400 people / unit</div>
-			</div>
-		</div>
-
-		<div class="mt-6 grid gap-6 lg:grid-cols-3">
-			<div class="settlement-panel-strong p-4">
-				<div class="flex items-center justify-between gap-4">
-					<h3 class="font-medium text-[color:var(--settlement-text)]">Provided services</h3>
-					<div class="flex gap-3 text-xs">
-						<button
-							type="button"
-							class="settlement-action"
-							onclick={() => setAllServices(true)}>all on</button
-						>
-						<button
-							type="button"
-							class="settlement-action"
-							onclick={() => setAllServices(false)}>all off</button
-						>
+	<div class="grid gap-6 lg:grid-cols-3">
+		<section class="card bg-base-100/80 shadow-xl">
+			<div class="card-body space-y-4">
+				<div class="flex items-center justify-between">
+					<h3 class="text-lg font-semibold text-base-content">Provided services</h3>
+					<div class="flex gap-2 text-xs uppercase tracking-[0.36em] text-base-content/60">
+						<button class="btn btn-ghost btn-xs" type="button" onclick={() => setAllServices(true)}>All On</button>
+						<button class="btn btn-ghost btn-xs" type="button" onclick={() => setAllServices(false)}>All Off</button>
 					</div>
 				</div>
-				<div class="mt-3 space-y-2 text-sm text-[color:var(--settlement-text)]">
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideElectricity} />
-						<img src={icon.electricity} alt="" class="h-4 w-4" />Electricity
+				<div class="space-y-2 text-sm text-base-content">
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideElectricity} />
+						<img src={icon.electricity} alt="" class="h-4 w-4" />
+						<span>Electricity</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideWater} />
-						<img src={icon.water} alt="" class="h-4 w-4" />Water
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideWater} />
+						<img src={icon.water} alt="" class="h-4 w-4" />
+						<span>Water</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideWasteWaterRemoval} />
-						<img src={icon.wasteWater} alt="" class="h-4 w-4" />Waste Water removal
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideWasteWaterRemoval} />
+						<img src={icon.wasteWater} alt="" class="h-4 w-4" />
+						<span>Waste Water removal</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideHouseholdGoods} />
-						<img src={icon.householdGoods} alt="" class="h-4 w-4" />Household Goods
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideHouseholdGoods} />
+						<img src={icon.householdGoods} alt="" class="h-4 w-4" />
+						<span>Household Goods</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideHouseholdAppliances} />
-						<img src={icon.householdAppliances} alt="" class="h-4 w-4" />Household Appliances
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideHouseholdAppliances} />
+						<img src={icon.householdAppliances} alt="" class="h-4 w-4" />
+						<span>Household Appliances</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideLuxuryGoods} />
-						<img src={icon.luxuryGoods} alt="" class="h-4 w-4" />Luxury Goods
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideLuxuryGoods} />
+						<img src={icon.luxuryGoods} alt="" class="h-4 w-4" />
+						<span>Luxury Goods</span>
 					</label>
-					<label class="settlement-check">
-						<input
-							type="checkbox"
-							bind:checked={provideConsumerElectronics}
-						/>
-						<img src={icon.consumerElectronics} alt="" class="h-4 w-4" />Consumer Electronics
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideConsumerElectronics} />
+						<img src={icon.consumerElectronics} alt="" class="h-4 w-4" />
+						<span>Consumer Electronics</span>
 					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={provideComputing} />
-						<img src={icon.computing} alt="" class="h-4 w-4" />Computing
+					<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<input type="checkbox" class="checkbox checkbox-primary" bind:checked={provideComputing} />
+						<img src={icon.computing} alt="" class="h-4 w-4" />
+						<span>Computing</span>
 					</label>
-					<label class="settlement-select-row">
-						<span>Medical</span>
-						<select class="settlement-input settlement-select" bind:value={medicalLevel}>
+					<label class="flex flex-col gap-2 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+						<span class="text-sm font-medium">Medical</span>
+						<select class="select select-bordered" bind:value={medicalLevel}>
 							<option value="none">None</option>
 							<option value="medical1">Medical Supplies I</option>
 							<option value="medical2">Medical Supplies II</option>
@@ -555,44 +527,41 @@
 					</label>
 				</div>
 			</div>
+		</section>
 
-			<div class="settlement-panel-strong p-4">
-				<h3 class="font-medium text-[color:var(--settlement-text)]">Connected collection</h3>
-				<div class="mt-3 space-y-2 text-sm text-[color:var(--settlement-text)]">
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={collectBiomass} />
-						<img src={icon.biomass} alt="" class="h-4 w-4" />Biomass Collection
-					</label>
-					<label class="settlement-check">
-						<input type="checkbox" bind:checked={collectRecyclables} />
-						<img src={icon.recyclables} alt="" class="h-4 w-4" />Recyclables Collection
-					</label>
-				</div>
+		<section class="card bg-base-100/80 shadow-xl">
+			<div class="card-body space-y-4">
+				<h3 class="text-lg font-semibold text-base-content">Connected collection</h3>
+				<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+					<input type="checkbox" class="checkbox checkbox-primary" bind:checked={collectBiomass} />
+					<img src={icon.biomass} alt="" class="h-4 w-4" />
+					<span>Collect biomass</span>
+				</label>
+				<label class="flex items-center gap-3 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
+					<input type="checkbox" class="checkbox checkbox-primary" bind:checked={collectRecyclables} />
+					<img src={icon.recyclables} alt="" class="h-4 w-4" />
+					<span>Collect recyclables</span>
+				</label>
 			</div>
+		</section>
 
-			<div class="settlement-panel-strong p-4">
-				<div class="flex items-center justify-between gap-4">
-					<h3 class="font-medium text-[color:var(--settlement-text)]">Provided food types</h3>
-					<div class="flex gap-3 text-xs">
-						<button
-							type="button"
-							class="settlement-action"
-							onclick={() => setAllFoods(true)}>all on</button
-						>
-						<button
-							type="button"
-							class="settlement-action"
-							onclick={() => setAllFoods(false)}>all off</button
-						>
+		<section class="card bg-base-100/80 shadow-xl">
+			<div class="card-body space-y-4">
+				<div class="flex items-center justify-between">
+					<h3 class="text-lg font-semibold text-base-content">Provided food types</h3>
+					<div class="flex gap-2 text-xs uppercase tracking-[0.35em] text-base-content/60">
+						<button class="btn btn-ghost btn-xs" type="button" onclick={() => setAllFoods(true)}>All On</button>
+						<button class="btn btn-ghost btn-xs" type="button" onclick={() => setAllFoods(false)}>All Off</button>
 					</div>
 				</div>
-				<div class="mt-3 grid grid-cols-2 gap-2 text-sm text-[color:var(--settlement-text)]">
+				<div class="grid grid-cols-2 gap-2 text-sm text-base-content">
 					{#each foods as food}
-						<label class="settlement-check">
+						<label class="flex items-center gap-2 rounded-xl border border-base-200/50 bg-base-200/40 px-3 py-2">
 							<input
 								type="checkbox"
 								checked={selectedFoodKeys.has(food.key)}
 								onchange={() => toggleFood(food.key)}
+								class="checkbox checkbox-secondary"
 							/>
 							<img src={food.icon} alt="" class="h-4 w-4" />
 							<span>{food.name}</span>
@@ -600,139 +569,141 @@
 					{/each}
 				</div>
 			</div>
-		</div>
-	</section>
+		</section>
+	</div>
 
 	<section class="grid gap-6 lg:grid-cols-2">
-		<div class="settlement-panel-strong p-5 sm:p-6">
-			<h2 class="flex items-center gap-2 text-xl font-semibold text-[color:var(--settlement-text)]">
-				<img src={icon.food} alt="" class="h-5 w-5" />Needs
-			</h2>
-			<p class="mt-1 text-sm text-[color:var(--settlement-muted)]">
-				Demand values are per 60s for the estimated population.
-			</p>
-			<div class="mt-4 overflow-x-auto">
-				<table class="settlement-table text-sm">
-					<thead>
-						<tr>
-							<th class="py-2 pr-4">Service</th>
-							<th class="py-2 pr-4">Per 1000</th>
-							<th class="py-2">Total</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each serviceNeeds.filter((s) => s.enabled) as s}
+		<section class="card bg-base-100/80 shadow-xl">
+			<div class="card-body">
+				<div class="flex items-center gap-3">
+					<img src={icon.food} alt="" class="h-5 w-5" />
+					<h2 class="text-xl font-semibold text-base-content">Needs</h2>
+				</div>
+				<p class="text-sm text-base-content/60">Demand values are per 60s for the estimated population.</p>
+				<div class="mt-4 overflow-x-auto">
+					<table class="table table-compact w-full text-sm">
+						<thead>
 							<tr>
-								<td class="py-2 pr-4">
-									<div class="flex items-center gap-2">
-										{#if s.icon}
-											<img src={s.icon} alt="" class="h-4 w-4" />
-										{:else}
-											<span class="h-2 w-2 rounded-full bg-slate-400"></span>
-										{/if}
-										<span>{s.name}</span>
-									</div>
-								</td>
-								<td class="py-2 pr-4">{roundTo(s.per1000, 3)} {s.unit}</td>
-								<td class="py-2">{roundTo(s.per1000 * popScale, 3)} {s.unit}</td>
+								<th>Service</th>
+								<th>Per 1000</th>
+								<th>Total</th>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{#each serviceNeeds.filter((s) => s.enabled) as s}
+								<tr>
+									<td>
+										<div class="flex items-center gap-2">
+											{#if s.icon}
+												<img src={s.icon} alt="" class="h-4 w-4" />
+											{/if}
+											<span>{s.name}</span>
+										</div>
+									</td>
+									<td>{roundTo(s.per1000, 3)} {s.unit}</td>
+									<td>{roundTo(s.per1000 * popScale, 3)} {s.unit}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
+		</section>
 
-		<div class="settlement-panel-strong p-5 sm:p-6">
-			<h2 class="flex items-center gap-2 text-xl font-semibold text-[color:var(--settlement-text)]">
-				<img src={icon.food} alt="" class="h-5 w-5" />Food demand
-			</h2>
-			<p class="mt-1 text-sm text-[color:var(--settlement-muted)]">
-				Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, shown per month.
-			</p>
-			<div class="mt-3 overflow-x-auto">
-				<table class="settlement-table text-sm">
-					<thead>
-						<tr>
-							<th class="py-2 pr-4">Food</th>
-							<th class="py-2 pr-4">Category</th>
-							<th class="py-2">Total / month</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each foodNeedsPer1000PerMonth as f}
+		<section class="card bg-base-100/80 shadow-xl">
+			<div class="card-body">
+				<div class="flex items-center gap-3">
+					<img src={icon.food} alt="" class="h-5 w-5" />
+					<h2 class="text-xl font-semibold text-base-content">Food demand</h2>
+				</div>
+				<p class="text-sm text-base-content/60">
+					Computed from the wiki formula: <span class="font-mono">A / (Nc * N)</span>, shown per month.
+				</p>
+				<div class="mt-3 overflow-x-auto">
+					<table class="table table-compact w-full text-sm">
+						<thead>
 							<tr>
-								<td class="py-2 pr-4">
-									<div class="flex items-center gap-2">
-										<img src={f.icon} alt="" class="h-4 w-4" />
-										<span>{f.name}</span>
-									</div>
-								</td>
-								<td class="py-2 pr-4">{f.category}</td>
-								<td class="py-2">{roundTo(f.value * popScale, 2)}</td>
+								<th>Food</th>
+								<th>Category</th>
+								<th>Total / month</th>
 							</tr>
-						{/each}
-						<tr class="font-semibold">
-							<td class="py-2 pr-4">Total Food</td>
-							<td class="py-2 pr-4">-</td>
-							<td class="py-2">{roundTo(foodNeedsTotalPer1000PerMonth * popScale, 2)}</td>
-						</tr>
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{#each foodNeedsPer1000PerMonth as f}
+								<tr>
+									<td>
+										<div class="flex items-center gap-2">
+											<img src={f.icon} alt="" class="h-4 w-4" />
+											<span>{f.name}</span>
+										</div>
+									</td>
+									<td>{f.category}</td>
+									<td>{roundTo(f.value * popScale, 2)}</td>
+								</tr>
+							{/each}
+							<tr class="font-semibold">
+								<td>Total Food</td>
+								<td>-</td>
+								<td>{roundTo(foodNeedsTotalPer1000PerMonth * popScale, 2)}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
+		</section>
 	</section>
 
-	<section>
-		<div class="settlement-panel-strong p-5 sm:p-6">
-			<h2 class="flex items-center gap-2 text-xl font-semibold text-[color:var(--settlement-text)]">
-				<img src={icon.waste} alt="" class="h-5 w-5" />Waste-Products
-			</h2>
-			<p class="mt-1 text-sm text-[color:var(--settlement-muted)]">
+	<section class="card bg-base-100/80 shadow-xl">
+		<div class="card-body">
+			<div class="flex items-center gap-3">
+				<img src={icon.waste} alt="" class="h-5 w-5" />
+				<h2 class="text-xl font-semibold text-base-content">Waste-Products</h2>
+			</div>
+			<p class="text-sm text-base-content/60">
 				Outputs are per 60s for the estimated population.
 				{#if selectedFoods.length > 0 && selectedFoods.length < foods.length}
 					Food-derived biomass is shown as a range because the wiki provides 1.3-6.4 for partial food sets.
 				{/if}
 			</p>
-
 			<div class="mt-4 overflow-x-auto">
-				<table class="settlement-table text-sm">
+				<table class="table table-compact w-full text-sm">
 					<thead>
 						<tr>
-							<th class="py-2 pr-4">Product</th>
-							<th class="py-2 pr-4">Per 1000</th>
-							<th class="py-2">Total</th>
+							<th>Product</th>
+							<th>Per 1000</th>
+							<th>Total</th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr>
-							<td class="py-2 pr-4">
+							<td>
 								<div class="flex items-center gap-2">
 									<img src={icon.waste} alt="" class="h-4 w-4" />
 									<span>Waste</span>
 								</div>
 							</td>
-							<td class="py-2 pr-4">{formatRange(effectiveWastePer1000, 3)}</td>
-							<td class="py-2">{formatRange(totalWaste, 3)}</td>
+							<td>{formatRange(effectiveWastePer1000, 3)}</td>
+							<td>{formatRange(totalWaste, 3)}</td>
 						</tr>
 						<tr>
-							<td class="py-2 pr-4">
+							<td>
 								<div class="flex items-center gap-2">
 									<img src={icon.biomass} alt="" class="h-4 w-4" />
 									<span>Biomass</span>
 								</div>
 							</td>
-							<td class="py-2 pr-4">{formatRange(effectiveBiomassPer1000, 3)}</td>
-							<td class="py-2">{formatRange(totalBiomass, 3)}</td>
+							<td>{formatRange(effectiveBiomassPer1000, 3)}</td>
+							<td>{formatRange(totalBiomass, 3)}</td>
 						</tr>
 						<tr>
-							<td class="py-2 pr-4">
+							<td>
 								<div class="flex items-center gap-2">
 									<img src={icon.recyclables} alt="" class="h-4 w-4" />
 									<span>Recyclables</span>
 								</div>
 							</td>
-							<td class="py-2 pr-4">{roundTo(effectiveRecyclablesPer1000, 3)}</td>
-							<td class="py-2">{roundTo(totalRecyclables.min, 3)}</td>
+							<td>{roundTo(effectiveRecyclablesPer1000, 3)}</td>
+							<td>{roundTo(totalRecyclables.min, 3)}</td>
 						</tr>
 					</tbody>
 				</table>
@@ -740,136 +711,3 @@
 		</div>
 	</section>
 </div>
-
-<style>
-	.settlement-page {
-		--settlement-text: #0f172a;
-		--settlement-muted: #475569;
-		--settlement-border: rgb(148 163 184 / 0.32);
-		--settlement-panel: rgb(255 255 255 / 0.78);
-		--settlement-panel-strong: rgb(255 255 255 / 0.92);
-		--settlement-pill: rgb(255 255 255 / 0.6);
-		--settlement-chip: rgb(255 255 255 / 0.55);
-		--settlement-input-bg: rgb(255 255 255 / 0.92);
-	}
-
-	:global(html.dark) .settlement-page {
-		--settlement-text: #e2e8f0;
-		--settlement-muted: #94a3b8;
-		--settlement-border: rgb(71 85 105 / 0.9);
-		--settlement-panel: rgb(15 23 42 / 0.72);
-		--settlement-panel-strong: rgb(15 23 42 / 0.92);
-		--settlement-pill: rgb(15 23 42 / 0.45);
-		--settlement-chip: rgb(15 23 42 / 0.75);
-		--settlement-input-bg: rgb(15 23 42 / 0.96);
-	}
-
-	.settlement-hero,
-	.settlement-panel,
-	.settlement-panel-strong,
-	.settlement-kpi {
-		border: 1px solid var(--settlement-border);
-		background: var(--settlement-panel);
-		color: var(--settlement-text);
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
-		box-shadow: 0 18px 45px rgb(15 23 42 / 0.08);
-	}
-
-	.settlement-panel-strong {
-		background: var(--settlement-panel-strong);
-	}
-
-	.settlement-hero {
-		position: relative;
-		overflow: hidden;
-		border-radius: 1.5rem;
-		background:
-			linear-gradient(135deg, rgb(255 255 255 / 0.85), rgb(255 248 235 / 0.8)),
-			linear-gradient(135deg, rgb(248 250 252 / 0.95), rgb(255 255 255 / 0.86));
-	}
-
-	:global(html.dark) .settlement-hero {
-		background:
-			linear-gradient(135deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.92)),
-			linear-gradient(135deg, rgb(30 41 59 / 0.9), rgb(15 23 42 / 0.82));
-	}
-
-	.settlement-kpi {
-		border-radius: 1rem;
-		padding: 1rem;
-	}
-
-	.settlement-input,
-	.settlement-select {
-		border: 1px solid var(--settlement-border);
-		border-radius: 0.9rem;
-		background: var(--settlement-input-bg);
-		color: var(--settlement-text);
-		padding: 0.75rem 0.95rem;
-		outline: none;
-		transition:
-			border-color 0.15s ease,
-			box-shadow 0.15s ease,
-			transform 0.15s ease;
-	}
-
-	.settlement-input:focus,
-	.settlement-select:focus {
-		border-color: rgb(96 165 250 / 0.9);
-		box-shadow: 0 0 0 3px rgb(96 165 250 / 0.18);
-	}
-
-	.settlement-action {
-		color: rgb(59 130 246);
-		text-decoration: underline;
-		text-underline-offset: 0.2em;
-	}
-
-	:global(html.dark) .settlement-action {
-		color: rgb(147 197 253);
-	}
-
-	.settlement-check,
-	.settlement-select-row {
-		display: flex;
-		align-items: center;
-		gap: 0.55rem;
-	}
-
-	.settlement-check input {
-		accent-color: rgb(245 158 11);
-	}
-
-	.settlement-select-row {
-		justify-content: space-between;
-		border-top: 1px solid var(--settlement-border);
-		padding-top: 0.75rem;
-		margin-top: 0.25rem;
-	}
-
-	.settlement-table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-
-	.settlement-table th {
-		text-align: left;
-		font-size: 0.75rem;
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: var(--settlement-muted);
-		border-bottom: 1px solid var(--settlement-border);
-	}
-
-	.settlement-table td {
-		color: var(--settlement-text);
-		border-bottom: 1px solid rgb(148 163 184 / 0.16);
-		vertical-align: top;
-	}
-
-	.settlement-table tr:last-child td {
-		border-bottom: 0;
-	}
-</style>
