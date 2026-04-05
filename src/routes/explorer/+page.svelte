@@ -1,93 +1,26 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import {
+		getBuildingIconHref,
+		getProductIconHref,
+		getRecipeMachineId,
+		humanizeLabel,
+		type Building,
+		type Contract,
+		type Database,
+		type Product,
+		type Recipe,
+		type RecipeIO
+	} from '$lib/coi-data';
 
-	type Resource = {
-		type: 'resource';
-		id: string;
-		name: string;
-		description: string | null;
-		state: string | null;
-	};
-
-	type Building = {
-		type: 'building';
-		id: string;
-		name: string;
-		description: string | null;
-		stats?: {
-			workers?: number;
-			electricity_kw?: number;
-			computing_tflops?: number;
-			maintenance_cost?: {
-				item_id: string;
-				amount: number;
-				period: number;
-			};
-			footprint?: string;
-			required_research?: string[];
-			variants?: string[];
-		};
-		construction?: Array<{
-			item_id: string;
-			amount: number;
-		}>;
-	};
-
-	type RecipeIO = {
-		item_id: string;
-		amount: number;
-	};
-
-	type Recipe = {
-		machine_id: string;
-		base?: {
-			duration?: number;
-			inputs?: RecipeIO[];
-			outputs?: RecipeIO[];
-		};
-		scaled?: {
-			duration?: number;
-			inputs?: RecipeIO[];
-			outputs?: RecipeIO[];
-		};
-	};
-
-	type Contract = {
-		village: string;
-		reputation_required: string;
-		export: {
-			id: string | null;
-			amount: number;
-		};
-		import: {
-			id: string | null;
-			amount: number;
-		};
-		unity: {
-			per_month: number;
-			per_ship: number;
-			at_establish: number;
-		};
-	};
-
-	type Database = {
-		metadata?: {
-			generated_at?: string;
-			counts?: Record<string, number>;
-		};
-		resources: Resource[];
-		buildings: Building[];
-		recipes: Recipe[];
-		contracts: Contract[];
-	};
-
-	type ExplorerType = 'resources' | 'buildings' | 'recipes' | 'contracts';
+	type ExplorerType = 'products' | 'buildings' | 'recipes' | 'contracts';
 
 	type ListItem = {
 		id: string;
 		label: string;
 		subtitle?: string;
 		searchText: string;
+		iconHref?: string;
 	};
 
 	type RecipeItem = ListItem & {
@@ -100,49 +33,55 @@
 		index: number;
 	};
 
-	type LinkedRecipe = {
-		id: string;
-		label: string;
-	};
-
-	type IndexedContract = {
-		contract: Contract;
-		index: number;
-	};
-
 	let { data } = $props<{ data: { database: Database } }>();
 
 	const database = $derived(data.database);
-	const resources = $derived(database.resources ?? ([] as Resource[]));
+	const products = $derived(database.products ?? ([] as Product[]));
 	const buildings = $derived(database.buildings ?? ([] as Building[]));
 	const recipes = $derived(database.recipes ?? ([] as Recipe[]));
 	const contracts = $derived(database.contracts ?? ([] as Contract[]));
 
-	const resourcesById = $derived.by(
-		() => new Map<string, Resource>(resources.map((resource: Resource) => [resource.id, resource]))
+	const productsById = $derived.by(
+		() => new Map<string, Product>(products.map((product: Product) => [product.id, product]))
 	);
 	const buildingsById = $derived.by(
 		() => new Map<string, Building>(buildings.map((building: Building) => [building.id, building]))
 	);
 
+	function getProductName(productId: string) {
+		const product = productsById.get(productId);
+		return product ? humanizeLabel(product.name) : humanizeLabel(productId.replace(/^product_/, ''));
+	}
+
+	function getBuildingName(buildingId: string) {
+		const building = buildingsById.get(buildingId);
+		return building ? humanizeLabel(building.name) : humanizeLabel(buildingId);
+	}
+
+	function formatRecipeEntry(entry: RecipeIO) {
+		return `${entry.amount} ${getProductName(entry.product_id)}`;
+	}
+
 	const recipeItems = $derived.by((): RecipeItem[] =>
 		recipes.map((recipe: Recipe, index: number) => {
-			const id = `recipe:${recipe.machine_id}:${index}`;
-			const building = buildingsById.get(recipe.machine_id);
-			const outputNames =
-				recipe.base?.outputs?.map((entry: RecipeIO) => getResourceName(entry.item_id)) ?? [];
+			const machineId = getRecipeMachineId(recipe);
+			const machineName = machineId ? getBuildingName(machineId) : 'Unassigned recipe';
+			const outputNames = recipe.outputs?.map((entry: RecipeIO) => getProductName(entry.product_id)) ?? [];
+			const inputNames = recipe.inputs?.map((entry: RecipeIO) => getProductName(entry.product_id)) ?? [];
+			const id = `recipe:${machineId ?? 'unassigned'}:${index}`;
 
 			return {
 				id,
 				label: outputNames.length
-					? `${building?.name ?? recipe.machine_id} -> ${outputNames.join(', ')}`
-					: (building?.name ?? recipe.machine_id),
+					? `${machineName} -> ${outputNames.join(', ')}`
+					: machineName,
 				subtitle: `Recipe ${index + 1}`,
 				searchText: [
-					building?.name ?? recipe.machine_id,
-					recipe.machine_id,
+					machineName,
+					machineId ?? '',
 					outputNames.join(' '),
-					recipe.base?.inputs?.map((entry: RecipeIO) => entry.item_id).join(' ') ?? ''
+					inputNames.join(' '),
+					recipe.duration ?? ''
 				]
 					.join(' ')
 					.toLowerCase(),
@@ -154,16 +93,23 @@
 
 	const contractItems = $derived.by((): ContractItem[] =>
 		contracts.map((contract: Contract, index: number) => {
+			const inputNames = contract.inputs.map((entry: RecipeIO) => getProductName(entry.product_id));
+			const outputNames = contract.outputs.map((entry: RecipeIO) => getProductName(entry.product_id));
 			const id = `contract:${index}`;
-			const exportName = contract.export.id ? getResourceName(contract.export.id) : 'Nothing';
-			const importName = contract.import.id ? getResourceName(contract.import.id) : 'Nothing';
 
 			return {
 				id,
-				label: `Village ${contract.village}: ${exportName} for ${importName}`,
+				label: `Reputation ${contract.reputation_level}: ${inputNames.join(', ')} for ${outputNames.join(', ')}`,
 				subtitle: `Contract ${index + 1}`,
-				searchText:
-					`${contract.village} ${contract.reputation_required} ${exportName} ${importName}`.toLowerCase(),
+				searchText: [
+					String(contract.reputation_level),
+					inputNames.join(' '),
+					outputNames.join(' '),
+					contract.inputs.map((entry: RecipeIO) => entry.product_id).join(' '),
+					contract.outputs.map((entry: RecipeIO) => entry.product_id).join(' ')
+				]
+					.join(' ')
+					.toLowerCase(),
 				contract,
 				index
 			};
@@ -172,18 +118,36 @@
 
 	const listItems = $derived.by(
 		(): Record<ExplorerType, ListItem[]> => ({
-			resources: resources.map((resource: Resource) => ({
-				id: resource.id,
-				label: getResourceName(resource.id),
-				subtitle: resource.state ?? undefined,
-				searchText:
-					`${getResourceName(resource.id)} ${resource.id} ${resource.state ?? ''} ${resource.description ?? ''}`.toLowerCase()
+			products: products.map((product: Product) => ({
+				id: product.id,
+				label: getProductName(product.id),
+				subtitle: product.state ?? undefined,
+				searchText: [
+					getProductName(product.id),
+					product.id,
+					product.state ?? '',
+					product.description ?? '',
+					product.is_trash ? 'trash' : '',
+					product.is_storable ? 'storable' : 'unstorable'
+				]
+					.join(' ')
+					.toLowerCase(),
+				iconHref: getProductIconHref(product.id)
 			})),
 			buildings: buildings.map((building: Building) => ({
 				id: building.id,
-				label: building.name,
+				label: getBuildingName(building.id),
 				subtitle: building.stats?.footprint ? `Footprint ${building.stats.footprint}` : undefined,
-				searchText: `${building.name} ${building.id} ${building.description ?? ''}`.toLowerCase()
+				searchText: [
+					getBuildingName(building.id),
+					building.id,
+					building.name,
+					building.stats?.variants?.join(' ') ?? '',
+					building.description ?? ''
+				]
+					.join(' ')
+					.toLowerCase(),
+				iconHref: getBuildingIconHref(building.id)
 			})),
 			recipes: recipeItems,
 			contracts: contractItems
@@ -192,24 +156,24 @@
 
 	const typeCounts = $derived.by(
 		(): Record<ExplorerType, number> => ({
-			resources: resources.length,
+			products: products.length,
 			buildings: buildings.length,
 			recipes: recipes.length,
 			contracts: contracts.length
 		})
 	);
 
-	const orderedTypes: ExplorerType[] = ['resources', 'buildings', 'recipes', 'contracts'];
+	const orderedTypes: ExplorerType[] = ['products', 'buildings', 'recipes', 'contracts'];
 
 	let search = $state('');
 
 	function parseType(rawType: string | null): ExplorerType {
-		return rawType === 'resources' ||
+		return rawType === 'products' ||
 			rawType === 'buildings' ||
 			rawType === 'recipes' ||
 			rawType === 'contracts'
 			? rawType
-			: 'resources';
+			: 'products';
 	}
 
 	function buildHref(type: ExplorerType, id?: string) {
@@ -219,68 +183,10 @@
 		return `/explorer/?${params.toString()}`;
 	}
 
-	function humanizeLabel(value: string) {
-		return value
-			.replace(/_/g, ' ')
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean)
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-	}
-
-	function getResourceIcon(id: string) {
-		return `/www/assets/images/resources/${id}.png`;
-	}
-
-	function getResourceName(id: string) {
-		const resource = resourcesById.get(id);
-		return humanizeLabel(resource?.name ?? id);
-	}
-
 	function getFilteredItems(type: ExplorerType, query: string): ListItem[] {
 		const normalizedQuery = query.trim().toLowerCase();
 		if (!normalizedQuery) return listItems[type];
 		return listItems[type].filter((item: ListItem) => item.searchText.includes(normalizedQuery));
-	}
-
-	function formatResourceAmount(entry: RecipeIO) {
-		return `${entry.amount} ${getResourceName(entry.item_id)}`;
-	}
-
-	function getRecipeId(recipe: Recipe, index: number) {
-		return `recipe:${recipe.machine_id}:${index}`;
-	}
-
-	function getRecipeLabel(recipe: Recipe, index: number) {
-		return (
-			recipeItems[index]?.label ??
-			`${buildingsById.get(recipe.machine_id)?.name ?? recipe.machine_id} (${index + 1})`
-		);
-	}
-
-	function linkedRecipesForResource(resourceId: string, mode: 'input' | 'output'): LinkedRecipe[] {
-		return recipes
-			.map((recipe: Recipe, index: number) => ({ recipe, index }))
-			.filter(({ recipe }: { recipe: Recipe; index: number }) =>
-				(mode === 'input' ? recipe.base?.inputs : recipe.base?.outputs)?.some(
-					(entry: RecipeIO) => entry.item_id === resourceId
-				)
-			)
-			.map(({ recipe, index }: { recipe: Recipe; index: number }) => ({
-				id: getRecipeId(recipe, index),
-				label: getRecipeLabel(recipe, index)
-			}));
-	}
-
-	function linkedRecipesForBuilding(buildingId: string): LinkedRecipe[] {
-		return recipes
-			.map((recipe: Recipe, index: number) => ({ recipe, index }))
-			.filter(({ recipe }: { recipe: Recipe; index: number }) => recipe.machine_id === buildingId)
-			.map(({ recipe, index }: { recipe: Recipe; index: number }) => ({
-				id: getRecipeId(recipe, index),
-				label: getRecipeLabel(recipe, index)
-			}));
 	}
 
 	function selectedItemId(requestedId: string | null, filteredItems: ListItem[]) {
@@ -290,19 +196,41 @@
 		return filteredItems[0]?.id ?? null;
 	}
 
-	function contractLabel(index: number) {
-		return contractItems[index]?.label ?? `Contract ${index + 1}`;
+	function getRecipeLabel(recipe: Recipe, index: number) {
+		return recipeItems[index]?.label ?? `Recipe ${index + 1}`;
 	}
 
-	function resourceContractMatches(
-		resourceId: string,
-		mode: 'export' | 'import'
-	): IndexedContract[] {
+	function linkedRecipesForProduct(productId: string, mode: 'input' | 'output') {
+		return recipes
+			.map((recipe: Recipe, index: number) => ({ recipe, index }))
+			.filter(({ recipe }: { recipe: Recipe; index: number }) =>
+				(mode === 'input' ? recipe.inputs : recipe.outputs)?.some(
+					(entry: RecipeIO) => entry.product_id === productId
+				)
+			)
+			.map(({ recipe, index }: { recipe: Recipe; index: number }) => ({
+				id: `recipe:${getRecipeMachineId(recipe) ?? 'unassigned'}:${index}`,
+				label: getRecipeLabel(recipe, index)
+			}));
+	}
+
+	function linkedRecipesForBuilding(buildingId: string) {
+		return recipes
+			.map((recipe: Recipe, index: number) => ({ recipe, index }))
+			.filter(({ recipe }: { recipe: Recipe; index: number }) => getRecipeMachineId(recipe) === buildingId)
+			.map(({ recipe, index }: { recipe: Recipe; index: number }) => ({
+				id: `recipe:${getRecipeMachineId(recipe) ?? 'unassigned'}:${index}`,
+				label: getRecipeLabel(recipe, index)
+			}));
+	}
+
+	function contractMatches(productId: string, mode: 'input' | 'output') {
 		return contracts
 			.map((contract: Contract, index: number) => ({ contract, index }))
-			.filter(
-				({ contract }: IndexedContract) =>
-					(mode === 'export' ? contract.export.id : contract.import.id) === resourceId
+			.filter(({ contract }: { contract: Contract; index: number }) =>
+				(mode === 'input' ? contract.inputs : contract.outputs).some(
+					(entry: RecipeIO) => entry.product_id === productId
+				)
 			);
 	}
 
@@ -310,8 +238,8 @@
 	const filteredItems = $derived(getFilteredItems(currentType, search));
 	const currentId = $derived(selectedItemId($page.url.searchParams.get('id'), filteredItems));
 
-	const currentResource = $derived(
-		currentType === 'resources' && currentId ? (resourcesById.get(currentId) ?? null) : null
+	const currentProduct = $derived(
+		currentType === 'products' && currentId ? (productsById.get(currentId) ?? null) : null
 	);
 	const currentBuilding = $derived(
 		currentType === 'buildings' && currentId ? (buildingsById.get(currentId) ?? null) : null
@@ -334,47 +262,45 @@
 	);
 
 	const producedBy = $derived(
-		currentResource
-			? linkedRecipesForResource(currentResource.id, 'output')
-			: ([] as LinkedRecipe[])
+		currentProduct ? linkedRecipesForProduct(currentProduct.id, 'output') : []
 	);
 	const consumedBy = $derived(
-		currentResource ? linkedRecipesForResource(currentResource.id, 'input') : ([] as LinkedRecipe[])
+		currentProduct ? linkedRecipesForProduct(currentProduct.id, 'input') : []
 	);
 	const buildingConstruction = $derived(
-		currentResource
+		currentProduct
 			? buildings.filter((building: Building) =>
-					building.construction?.some((entry: RecipeIO) => entry.item_id === currentResource.id)
+					building.construction_cost?.some(
+						(entry: { product_id: string; amount: number }) => entry.product_id === currentProduct.id
+					)
 				)
-			: ([] as Building[])
+			: []
 	);
 	const buildingMaintenance = $derived(
-		currentResource
+		currentProduct
 			? buildings.filter(
-					(building: Building) => building.stats?.maintenance_cost?.item_id === currentResource.id
+					(building: Building) => building.stats?.maintenance_cost?.product_id === currentProduct.id
 				)
-			: ([] as Building[])
+			: []
 	);
-	const contractExports = $derived(
-		currentResource
-			? resourceContractMatches(currentResource.id, 'export')
-			: ([] as IndexedContract[])
+	const contractInputs = $derived(
+		currentProduct ? contractMatches(currentProduct.id, 'input') : []
 	);
-	const contractImports = $derived(
-		currentResource
-			? resourceContractMatches(currentResource.id, 'import')
-			: ([] as IndexedContract[])
+	const contractOutputs = $derived(
+		currentProduct ? contractMatches(currentProduct.id, 'output') : []
 	);
-	const buildingRecipes = $derived(
-		currentBuilding ? linkedRecipesForBuilding(currentBuilding.id) : ([] as LinkedRecipe[])
-	);
+	const buildingRecipes = $derived(currentBuilding ? linkedRecipesForBuilding(currentBuilding.id) : []);
+	const recipeMachineId = $derived(currentRecipe ? getRecipeMachineId(currentRecipe) : null);
+	const recipeMachine = $derived(recipeMachineId ? (buildingsById.get(recipeMachineId) ?? null) : null);
+	const recipeOutputs = $derived(currentRecipe?.outputs ?? []);
+	const recipeInputs = $derived(currentRecipe?.inputs ?? []);
 </script>
 
 <div class="mx-auto flex h-full max-w-7xl flex-col px-4 py-8 sm:px-6 lg:px-8">
 	<div class="mb-6">
 		<h1 class="text-3xl font-bold text-gray-900">Explorer</h1>
 		<p class="mt-2 max-w-3xl text-sm text-gray-600">
-			Browse the Captain of Industry master database and follow links between resources, buildings,
+			Browse the Captain of Industry database and follow links between products, buildings,
 			recipes, and contracts.
 		</p>
 	</div>
@@ -425,9 +351,9 @@
 									}`}
 								>
 									<div class="flex items-center gap-3">
-										{#if currentType === 'resources'}
+										{#if item.iconHref}
 											<img
-												src={getResourceIcon(item.id)}
+												src={item.iconHref}
 												alt=""
 												class="h-8 w-8 rounded-md border border-gray-200 bg-white p-1"
 											/>
@@ -451,33 +377,33 @@
 		<section class="min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm">
 			{#if !currentId}
 				<div class="p-6 text-sm text-gray-500">Nothing to show.</div>
-			{:else if currentType === 'resources' && currentResource}
+			{:else if currentType === 'products' && currentProduct}
 				<div class="p-6">
 					<div class="mb-6 flex items-start justify-between gap-4">
 						<div class="flex items-start gap-4">
 							<img
-								src={getResourceIcon(currentResource.id)}
+								src={getProductIconHref(currentProduct.id)}
 								alt=""
 								class="h-14 w-14 rounded-xl border border-gray-200 bg-white p-2"
 							/>
 							<div>
 								<h2 class="text-2xl font-semibold text-gray-900">
-									{getResourceName(currentResource.id)}
+									{getProductName(currentProduct.id)}
 								</h2>
-								<div class="mt-1 font-mono text-sm text-gray-500">{currentResource.id}</div>
+								<div class="mt-1 font-mono text-sm text-gray-500">{currentProduct.id}</div>
 							</div>
 						</div>
-						{#if currentResource.state}
+						{#if currentProduct.state}
 							<div
 								class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold tracking-wide text-teal-700 uppercase"
 							>
-								{currentResource.state}
+								{currentProduct.state}
 							</div>
 						{/if}
 					</div>
 
-					{#if currentResource.description}
-						<p class="mb-6 text-sm leading-6 text-gray-700">{currentResource.description}</p>
+					{#if currentProduct.description}
+						<p class="mb-6 text-sm leading-6 text-gray-700">{currentProduct.description}</p>
 					{/if}
 
 					<div class="grid gap-6 xl:grid-cols-2">
@@ -487,15 +413,14 @@
 								<ul class="mt-3 space-y-2">
 									{#each producedBy as entry}
 										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('recipes', entry.id)}>{entry.label}</a
-											>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('recipes', entry.id)}>
+												{entry.label}
+											</a>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">No recipe outputs reference this resource.</p>
+								<p class="mt-3 text-sm text-gray-500">No recipe outputs reference this product.</p>
 							{/if}
 						</div>
 
@@ -505,104 +430,98 @@
 								<ul class="mt-3 space-y-2">
 									{#each consumedBy as entry}
 										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('recipes', entry.id)}>{entry.label}</a
-											>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('recipes', entry.id)}>
+												{entry.label}
+											</a>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">No recipe inputs reference this resource.</p>
+								<p class="mt-3 text-sm text-gray-500">No recipe inputs reference this product.</p>
 							{/if}
 						</div>
 
 						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Construction Usage</h3>
+							<h3 class="text-sm font-semibold text-gray-900">Construction Cost</h3>
 							{#if buildingConstruction.length}
 								<ul class="mt-3 space-y-2">
 									{#each buildingConstruction as building}
 										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('buildings', building.id)}>{building.name}</a
-											>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('buildings', building.id)}>
+												{getBuildingName(building.id)}
+											</a>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">
-									This resource is not used in building construction.
-								</p>
+								<p class="mt-3 text-sm text-gray-500">No buildings reference this product in construction.</p>
 							{/if}
 						</div>
 
 						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Maintenance Usage</h3>
+							<h3 class="text-sm font-semibold text-gray-900">Maintenance Cost</h3>
 							{#if buildingMaintenance.length}
 								<ul class="mt-3 space-y-2">
 									{#each buildingMaintenance as building}
 										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('buildings', building.id)}>{building.name}</a
-											>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('buildings', building.id)}>
+												{getBuildingName(building.id)}
+											</a>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">
-									This resource is not used as a maintenance item.
-								</p>
-							{/if}
-						</div>
-					</div>
-
-					<div class="mt-6 grid gap-6 xl:grid-cols-2">
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Exported In Contracts</h3>
-							{#if contractExports.length}
-								<ul class="mt-3 space-y-2">
-									{#each contractExports as entry}
-										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('contracts', `contract:${entry.index}`)}
-												>{contractLabel(entry.index)}</a
-											>
-										</li>
-									{/each}
-								</ul>
-							{:else}
-								<p class="mt-3 text-sm text-gray-500">No contract exports this resource.</p>
+								<p class="mt-3 text-sm text-gray-500">No buildings reference this product for maintenance.</p>
 							{/if}
 						</div>
 
 						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Imported In Contracts</h3>
-							{#if contractImports.length}
+							<h3 class="text-sm font-semibold text-gray-900">Contract Inputs</h3>
+							{#if contractInputs.length}
 								<ul class="mt-3 space-y-2">
-									{#each contractImports as entry}
+									{#each contractInputs as { index }}
 										<li>
-											<a
-												class="text-sm text-blue-700 hover:underline"
-												href={buildHref('contracts', `contract:${entry.index}`)}
-												>{contractLabel(entry.index)}</a
-											>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('contracts', `contract:${index}`)}>
+												{contractItems[index]?.label ?? `Contract ${index + 1}`}
+											</a>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">No contract imports this resource.</p>
+								<p class="mt-3 text-sm text-gray-500">No contracts import this product.</p>
+							{/if}
+						</div>
+
+						<div class="rounded-xl border border-gray-200 p-4">
+							<h3 class="text-sm font-semibold text-gray-900">Contract Outputs</h3>
+							{#if contractOutputs.length}
+								<ul class="mt-3 space-y-2">
+									{#each contractOutputs as { index }}
+										<li>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('contracts', `contract:${index}`)}>
+												{contractItems[index]?.label ?? `Contract ${index + 1}`}
+											</a>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-3 text-sm text-gray-500">No contracts export this product.</p>
 							{/if}
 						</div>
 					</div>
 				</div>
 			{:else if currentType === 'buildings' && currentBuilding}
 				<div class="p-6">
-					<div class="mb-6">
-						<h2 class="text-2xl font-semibold text-gray-900">{currentBuilding.name}</h2>
-						<div class="mt-1 font-mono text-sm text-gray-500">{currentBuilding.id}</div>
+					<div class="mb-6 flex items-start gap-4">
+						<img
+							src={getBuildingIconHref(currentBuilding.id)}
+							alt=""
+							class="h-14 w-14 rounded-xl border border-gray-200 bg-white p-2"
+						/>
+						<div>
+							<h2 class="text-2xl font-semibold text-gray-900">{getBuildingName(currentBuilding.id)}</h2>
+							<div class="mt-1 font-mono text-sm text-gray-500">{currentBuilding.id}</div>
+						</div>
 					</div>
 
 					{#if currentBuilding.description}
@@ -612,322 +531,165 @@
 					<div class="grid gap-6 xl:grid-cols-2">
 						<div class="rounded-xl border border-gray-200 p-4">
 							<h3 class="text-sm font-semibold text-gray-900">Stats</h3>
-							<dl class="mt-3 space-y-2 text-sm text-gray-700">
-								<div class="flex justify-between gap-4">
-									<dt>Workers</dt>
-									<dd>{currentBuilding.stats?.workers ?? '-'}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Electricity</dt>
-									<dd>{currentBuilding.stats?.electricity_kw ?? '-'} kW</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Computing</dt>
-									<dd>{currentBuilding.stats?.computing_tflops ?? '-'} TFLOPS</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Footprint</dt>
-									<dd>{currentBuilding.stats?.footprint ?? '-'}</dd>
-								</div>
-							</dl>
+							<div class="mt-3 space-y-2 text-sm text-gray-700">
+								<div>Workers: {currentBuilding.stats?.workers ?? 'Unknown'}</div>
+								<div>Electricity: {currentBuilding.stats?.electricity_kw ?? 'Unknown'} kW</div>
+								<div>Computing: {currentBuilding.stats?.computing_tflops ?? 'Unknown'} TFLOPS</div>
+								<div>Footprint: {currentBuilding.stats?.footprint ?? 'Unknown'}</div>
+								<div>Variants: {currentBuilding.stats?.variants?.join(', ') ?? 'None'}</div>
+							</div>
 						</div>
 
 						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Maintenance</h3>
-							{#if currentBuilding.stats?.maintenance_cost}
-								<p class="mt-3 text-sm text-gray-700">
-									<a
-										class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-										href={buildHref('resources', currentBuilding.stats.maintenance_cost.item_id)}
-									>
-										<img
-											src={getResourceIcon(currentBuilding.stats.maintenance_cost.item_id)}
-											alt=""
-											class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
-										/>
-										<span>{getResourceName(currentBuilding.stats.maintenance_cost.item_id)}</span>
-									</a>
-									{' '}• {currentBuilding.stats.maintenance_cost.amount} every {currentBuilding
-										.stats.maintenance_cost.period}s
-								</p>
+							<h3 class="text-sm font-semibold text-gray-900">Construction Cost</h3>
+							{#if currentBuilding.construction_cost?.length}
+								<ul class="mt-3 space-y-2 text-sm text-gray-700">
+									{#each currentBuilding.construction_cost as entry}
+										<li>{formatRecipeEntry(entry)}</li>
+									{/each}
+								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">No maintenance cost recorded.</p>
+								<p class="mt-3 text-sm text-gray-500">No construction cost data.</p>
 							{/if}
 						</div>
 
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Construction</h3>
-							{#if currentBuilding.construction?.length}
+						<div class="rounded-xl border border-gray-200 p-4 xl:col-span-2">
+							<h3 class="text-sm font-semibold text-gray-900">Recipes</h3>
+							{#if buildingRecipes.length}
 								<ul class="mt-3 space-y-2">
-									{#each currentBuilding.construction as entry}
-										<li class="text-sm text-gray-700">
-											<a
-												class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-												href={buildHref('resources', entry.item_id)}
-											>
-												<img
-													src={getResourceIcon(entry.item_id)}
-													alt=""
-													class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
-												/>
-												<span>{getResourceName(entry.item_id)}</span>
+									{#each buildingRecipes as entry}
+										<li>
+											<a class="text-sm text-blue-700 hover:underline" href={buildHref('recipes', entry.id)}>
+												{entry.label}
 											</a>
-											{' '}• {entry.amount}
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="mt-3 text-sm text-gray-500">No construction requirements recorded.</p>
+								<p class="mt-3 text-sm text-gray-500">No recipes reference this building.</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{:else if currentType === 'recipes' && currentRecipe}
+				<div class="p-6">
+					<div class="mb-6 flex items-start gap-4">
+						<img
+							src={recipeMachine ? getBuildingIconHref(recipeMachine.id) : getProductIconHref(recipeOutputs[0]?.product_id ?? 'product_waste')}
+							alt=""
+							class="h-14 w-14 rounded-xl border border-gray-200 bg-white p-2"
+						/>
+						<div>
+							<h2 class="text-2xl font-semibold text-gray-900">
+								{recipeMachine ? getBuildingName(recipeMachine.id) : 'Unassigned recipe'}
+							</h2>
+							<div class="mt-1 font-mono text-sm text-gray-500">{currentId}</div>
+						</div>
+					</div>
+
+					<div class="grid gap-6 xl:grid-cols-2">
+						<div class="rounded-xl border border-gray-200 p-4">
+							<h3 class="text-sm font-semibold text-gray-900">Recipe Details</h3>
+							<div class="mt-3 space-y-2 text-sm text-gray-700">
+								<div>Duration: {currentRecipe.duration ?? 'Unknown'}</div>
+								<div>Machine: {recipeMachine ? getBuildingName(recipeMachine.id) : 'Unassigned'}</div>
+								<div>Inputs: {recipeInputs.length}</div>
+								<div>Outputs: {recipeOutputs.length}</div>
+							</div>
+						</div>
+
+						<div class="rounded-xl border border-gray-200 p-4">
+							<h3 class="text-sm font-semibold text-gray-900">Inputs</h3>
+							{#if recipeInputs.length}
+								<ul class="mt-3 space-y-2 text-sm text-gray-700">
+									{#each recipeInputs as entry}
+										<li>{formatRecipeEntry(entry)}</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-3 text-sm text-gray-500">No inputs listed.</p>
+							{/if}
+						</div>
+
+						<div class="rounded-xl border border-gray-200 p-4 xl:col-span-2">
+							<h3 class="text-sm font-semibold text-gray-900">Outputs</h3>
+							{#if recipeOutputs.length}
+								<ul class="mt-3 space-y-2">
+									{#each recipeOutputs as entry}
+										<li class="flex items-center gap-3 text-sm text-gray-700">
+											<img
+												src={getProductIconHref(entry.product_id)}
+												alt=""
+												class="h-8 w-8 rounded-md border border-gray-200 bg-white p-1"
+											/>
+											<span>{formatRecipeEntry(entry)}</span>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-3 text-sm text-gray-500">No outputs listed.</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{:else if currentType === 'contracts' && currentContract}
+				<div class="p-6">
+					<div class="mb-6 flex items-start gap-4">
+						<div class="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-lg font-bold text-gray-700">
+							{currentContract.reputation_level}
+						</div>
+						<div>
+							<h2 class="text-2xl font-semibold text-gray-900">
+								Contract {(currentContractIndex ?? 0) + 1}
+							</h2>
+							<div class="mt-1 font-mono text-sm text-gray-500">{currentId}</div>
+						</div>
+					</div>
+
+					<div class="grid gap-6 xl:grid-cols-2">
+						<div class="rounded-xl border border-gray-200 p-4">
+							<h3 class="text-sm font-semibold text-gray-900">Inputs</h3>
+							{#if currentContract.inputs.length}
+								<ul class="mt-3 space-y-2 text-sm text-gray-700">
+									{#each currentContract.inputs as entry}
+										<li class="flex items-center gap-3">
+											<img
+												src={getProductIconHref(entry.product_id)}
+												alt=""
+												class="h-8 w-8 rounded-md border border-gray-200 bg-white p-1"
+											/>
+											<span>{formatRecipeEntry(entry)}</span>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-3 text-sm text-gray-500">No inputs listed.</p>
 							{/if}
 						</div>
 
 						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Research And Variants</h3>
-							<div class="mt-3 text-sm text-gray-700">
-								<div>
-									<span class="font-medium">Research:</span>
-									{#if currentBuilding.stats?.required_research?.length}
-										{currentBuilding.stats.required_research.join(', ')}
-									{:else}
-										None
-									{/if}
-								</div>
-								<div class="mt-2">
-									<span class="font-medium">Variants:</span>
-									{#if currentBuilding.stats?.variants?.length}
-										{currentBuilding.stats.variants.join(', ')}
-									{:else}
-										None
-									{/if}
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<div class="mt-6 rounded-xl border border-gray-200 p-4">
-						<h3 class="text-sm font-semibold text-gray-900">Recipes</h3>
-						{#if buildingRecipes.length}
-							<ul class="mt-3 space-y-2">
-								{#each buildingRecipes as entry}
-									<li>
-										<a
-											class="text-sm text-blue-700 hover:underline"
-											href={buildHref('recipes', entry.id)}>{entry.label}</a
-										>
-									</li>
-								{/each}
-							</ul>
-						{:else}
-							<p class="mt-3 text-sm text-gray-500">No recipes recorded for this building.</p>
-						{/if}
-					</div>
-				</div>
-			{:else if currentType === 'recipes' && currentRecipe && currentRecipeIndex !== null}
-				<div class="p-6">
-					<div class="mb-6">
-						<h2 class="text-2xl font-semibold text-gray-900">
-							{getRecipeLabel(currentRecipe, currentRecipeIndex)}
-						</h2>
-						<div class="mt-1 font-mono text-sm text-gray-500">{currentId}</div>
-					</div>
-
-					<div class="mb-6 rounded-xl border border-gray-200 p-4">
-						<h3 class="text-sm font-semibold text-gray-900">Machine</h3>
-						<p class="mt-3 text-sm text-gray-700">
-							<a
-								class="text-blue-700 hover:underline"
-								href={buildHref('buildings', currentRecipe.machine_id)}
-							>
-								{buildingsById.get(currentRecipe.machine_id)?.name ?? currentRecipe.machine_id}
-							</a>
-						</p>
-					</div>
-
-					<div class="grid gap-6 xl:grid-cols-2">
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Base Recipe</h3>
-							<p class="mt-3 text-sm text-gray-700">
-								Duration: {currentRecipe.base?.duration ?? '-'}s
-							</p>
-							<div class="mt-4">
-								<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-									Inputs
-								</div>
-								{#if currentRecipe.base?.inputs?.length}
-									<ul class="mt-2 space-y-2">
-										{#each currentRecipe.base.inputs as entry}
-											<li class="text-sm text-gray-700">
-												<a
-													class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-													href={buildHref('resources', entry.item_id)}
-												>
-													<img
-														src={getResourceIcon(entry.item_id)}
-														alt=""
-														class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
-													/>
-													<span>{getResourceName(entry.item_id)}</span>
-												</a>
-												{' '}• {entry.amount}
-											</li>
-										{/each}
-									</ul>
-								{:else}
-									<p class="mt-2 text-sm text-gray-500">None</p>
-								{/if}
-							</div>
-							<div class="mt-4">
-								<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-									Outputs
-								</div>
-								{#if currentRecipe.base?.outputs?.length}
-									<ul class="mt-2 space-y-2">
-										{#each currentRecipe.base.outputs as entry}
-											<li class="text-sm text-gray-700">
-												<a
-													class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-													href={buildHref('resources', entry.item_id)}
-												>
-													<img
-														src={getResourceIcon(entry.item_id)}
-														alt=""
-														class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
-													/>
-													<span>{getResourceName(entry.item_id)}</span>
-												</a>
-												{' '}• {entry.amount}
-											</li>
-										{/each}
-									</ul>
-								{:else}
-									<p class="mt-2 text-sm text-gray-500">None</p>
-								{/if}
-							</div>
-						</div>
-
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Scaled Recipe</h3>
-							<p class="mt-3 text-sm text-gray-700">
-								Duration: {currentRecipe.scaled?.duration ?? '-'}s
-							</p>
-							<div class="mt-4">
-								<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-									Inputs
-								</div>
-								{#if currentRecipe.scaled?.inputs?.length}
-									<ul class="mt-2 space-y-2">
-										{#each currentRecipe.scaled.inputs as entry}
-											<li class="text-sm text-gray-700">{formatResourceAmount(entry)}</li>
-										{/each}
-									</ul>
-								{:else}
-									<p class="mt-2 text-sm text-gray-500">None</p>
-								{/if}
-							</div>
-							<div class="mt-4">
-								<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-									Outputs
-								</div>
-								{#if currentRecipe.scaled?.outputs?.length}
-									<ul class="mt-2 space-y-2">
-										{#each currentRecipe.scaled.outputs as entry}
-											<li class="text-sm text-gray-700">{formatResourceAmount(entry)}</li>
-										{/each}
-									</ul>
-								{:else}
-									<p class="mt-2 text-sm text-gray-500">None</p>
-								{/if}
-							</div>
-						</div>
-					</div>
-				</div>
-			{:else if currentType === 'contracts' && currentContract && currentContractIndex !== null}
-				<div class="p-6">
-					<div class="mb-6">
-						<h2 class="text-2xl font-semibold text-gray-900">
-							{contractLabel(currentContractIndex)}
-						</h2>
-						<div class="mt-1 font-mono text-sm text-gray-500">{currentId}</div>
-					</div>
-
-					<div class="grid gap-6 xl:grid-cols-2">
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Trade</h3>
-							<div class="mt-3 space-y-3 text-sm text-gray-700">
-								<div>
-									<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-										Export
-									</div>
-									{#if currentContract.export.id}
-										<a
-											class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-											href={buildHref('resources', currentContract.export.id)}
-										>
+							<h3 class="text-sm font-semibold text-gray-900">Outputs</h3>
+							{#if currentContract.outputs.length}
+								<ul class="mt-3 space-y-2 text-sm text-gray-700">
+									{#each currentContract.outputs as entry}
+										<li class="flex items-center gap-3">
 											<img
-												src={getResourceIcon(currentContract.export.id)}
+												src={getProductIconHref(entry.product_id)}
 												alt=""
-												class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
+												class="h-8 w-8 rounded-md border border-gray-200 bg-white p-1"
 											/>
-											<span>{getResourceName(currentContract.export.id)}</span>
-										</a>
-										{' '}• {currentContract.export.amount}
-									{:else}
-										Nothing
-									{/if}
-								</div>
-								<div>
-									<div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-										Import
-									</div>
-									{#if currentContract.import.id}
-										<a
-											class="inline-flex items-center gap-2 text-blue-700 hover:underline"
-											href={buildHref('resources', currentContract.import.id)}
-										>
-											<img
-												src={getResourceIcon(currentContract.import.id)}
-												alt=""
-												class="h-5 w-5 rounded border border-gray-200 bg-white p-0.5"
-											/>
-											<span>{getResourceName(currentContract.import.id)}</span>
-										</a>
-										{' '}• {currentContract.import.amount}
-									{:else}
-										Nothing
-									{/if}
-								</div>
-							</div>
-						</div>
-
-						<div class="rounded-xl border border-gray-200 p-4">
-							<h3 class="text-sm font-semibold text-gray-900">Requirements</h3>
-							<dl class="mt-3 space-y-2 text-sm text-gray-700">
-								<div class="flex justify-between gap-4">
-									<dt>Village</dt>
-									<dd>{currentContract.village}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Reputation</dt>
-									<dd>{currentContract.reputation_required}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Unity / month</dt>
-									<dd>{currentContract.unity.per_month}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Unity / ship</dt>
-									<dd>{currentContract.unity.per_ship}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt>Unity at establish</dt>
-									<dd>{currentContract.unity.at_establish}</dd>
-								</div>
-							</dl>
+											<span>{formatRecipeEntry(entry)}</span>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-3 text-sm text-gray-500">No outputs listed.</p>
+							{/if}
 						</div>
 					</div>
 				</div>
 			{:else}
-				<div class="p-6 text-sm text-gray-500">The selected entry could not be resolved.</div>
+				<div class="p-6 text-sm text-gray-500">Nothing to show.</div>
 			{/if}
 		</section>
 	</div>

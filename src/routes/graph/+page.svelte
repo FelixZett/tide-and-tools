@@ -1,37 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
-
-	type Resource = {
-		id: string;
-		name: string;
-		state?: string | null;
-	};
-
-	type Building = {
-		id: string;
-		name: string;
-	};
-
-	type RecipeIO = {
-		item_id: string;
-		amount: number;
-	};
-
-	type Recipe = {
-		machine_id: string;
-		base?: {
-			duration?: number;
-			inputs?: RecipeIO[];
-			outputs?: RecipeIO[];
-		};
-	};
+	import {
+		getProductIconHref,
+		humanizeLabel,
+		type Building,
+		type Database,
+		type Product,
+		type Recipe,
+		type RecipeIO
+	} from '$lib/coi-data';
 
 	type GraphNode = {
 		id: string;
 		label: string;
 		searchText: string;
-		kind: 'resource' | 'recipe';
+		kind: 'product' | 'recipe';
 		state?: string | null;
 		radius: number;
 		title: string;
@@ -68,104 +51,227 @@
 		distanceById: Map<string, number>;
 	};
 
+	let { data } = $props<{ data: { database: Database } }>();
+
 	let svgElement = $state<SVGSVGElement | undefined>(undefined);
-	let database = $state<{ resources: Resource[]; buildings: Building[]; recipes: Recipe[] } | null>(
-		null
-	);
-	let errorMessage = $state('');
 	let search = $state('');
 	let selectedNodeId = $state<string | null>(null);
 	let hopDepth = $state(2);
 	let upstreamExtraDepth = $state(0);
 	let downstreamExtraDepth = $state(0);
 
+	const database = $derived(data.database);
+	const products = $derived(database.products ?? ([] as Product[]));
+	const buildings = $derived(database.buildings ?? ([] as Building[]));
+	const recipes = $derived(database.recipes ?? ([] as Recipe[]));
+
 	const NODE_RADIUS = {
-		resource: 22,
+		product: 22,
 		recipe: 12
 	} as const;
 
-	const RESOURCE_FILL = '#0f766e';
+	const PRODUCT_FILL = '#0f766e';
 	const RECIPE_FILL = '#b45309';
 
-	function describeRecipeAmounts(
-		entries: RecipeIO[] | undefined,
-		resourcesById: Map<string, Resource>
-	) {
-		const validEntries = (entries ?? []).filter(({ item_id }) => resourcesById.has(item_id));
+	function describeRecipeAmounts(entries: RecipeIO[] | undefined, productsById: Map<string, Product>) {
+		const validEntries = (entries ?? []).filter(({ product_id }) => productsById.has(product_id));
 		if (!validEntries.length) return 'none';
 
 		return validEntries
-			.map(({ item_id, amount }) => `${amount} ${resourcesById.get(item_id)?.name ?? item_id}`)
+			.map(({ product_id, amount }) => `${amount} ${productsById.get(product_id)?.name ?? humanizeLabel(product_id)}`)
 			.join(', ');
 	}
 
-	function createGraphData(
-		resources: Resource[],
-		buildings: Building[],
-		recipes: Recipe[]
-	): FullGraph {
-		const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-		const buildingsById = new Map(buildings.map((building) => [building.id, building]));
+	function normalizeBuildingReference(value: string) {
+		return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+	}
 
-		const nodes: GraphNode[] = resources.map((resource) => ({
-			id: resource.id,
-			label: resource.name,
-			searchText: `${resource.name} ${resource.id} ${resource.state ?? ''}`.toLowerCase(),
-			kind: 'resource',
-			state: resource.state ?? null,
-			radius: NODE_RADIUS.resource,
-			title: `${resource.name}${resource.state ? ` (${resource.state})` : ''}`,
-			iconHref: `/www/assets/images/resources/${resource.id}.png`
+	function recipeIoSignature(entries: RecipeIO[] | undefined) {
+		return JSON.stringify(
+			(entries ?? [])
+				.map(({ product_id, amount }) => [product_id, amount] as [string, number])
+				.sort(([leftId, leftAmount], [rightId, rightAmount]) =>
+					leftId === rightId ? leftAmount - rightAmount : leftId.localeCompare(rightId)
+				)
+		);
+	}
+
+	function createBuildingFamilies(items: Building[]) {
+		const aliasToIds = new Map<string, Set<string>>();
+		const neighbors = new Map<string, Set<string>>();
+
+		function addAlias(alias: string, id: string) {
+			if (!alias) return;
+			const existing = aliasToIds.get(alias) ?? new Set<string>();
+			existing.add(id);
+			aliasToIds.set(alias, existing);
+		}
+
+		function connect(leftId: string, rightId: string) {
+			if (leftId === rightId) return;
+			const left = neighbors.get(leftId) ?? new Set<string>();
+			left.add(rightId);
+			neighbors.set(leftId, left);
+			const right = neighbors.get(rightId) ?? new Set<string>();
+			right.add(leftId);
+			neighbors.set(rightId, right);
+		}
+
+		items.forEach((building) => {
+			addAlias(normalizeBuildingReference(building.id), building.id);
+			addAlias(normalizeBuildingReference(building.name), building.id);
+			neighbors.set(building.id, neighbors.get(building.id) ?? new Set<string>());
+		});
+
+		items.forEach((building) => {
+			for (const variant of building.stats?.variants ?? []) {
+				for (const variantId of aliasToIds.get(normalizeBuildingReference(variant)) ?? []) {
+					connect(building.id, variantId);
+				}
+			}
+		});
+
+		const familiesByBuildingId = new Map<
+			string,
+			{ familyId: string; buildingIds: string[]; buildingNames: string[] }
+		>();
+		const visited = new Set<string>();
+
+		for (const building of items) {
+			if (visited.has(building.id)) continue;
+
+			const queue = [building.id];
+			const component = new Set<string>();
+
+			while (queue.length) {
+				const currentId = queue.shift();
+				if (!currentId || visited.has(currentId)) continue;
+				visited.add(currentId);
+				component.add(currentId);
+
+				for (const neighborId of neighbors.get(currentId) ?? []) {
+					if (!visited.has(neighborId)) queue.push(neighborId);
+				}
+			}
+
+			const buildingIds = [...component].sort((left, right) => left.localeCompare(right));
+			const buildingNames = [...new Set(
+				buildingIds.map((id) => items.find((candidate) => candidate.id === id)?.name ?? id)
+			)].sort((left, right) => left.localeCompare(right));
+			const family = {
+				familyId: buildingIds[0] ?? building.id,
+				buildingIds,
+				buildingNames
+			};
+
+			buildingIds.forEach((id) => {
+				familiesByBuildingId.set(id, family);
+			});
+		}
+
+		return familiesByBuildingId;
+	}
+
+	function createGraphData(
+		productsList: Product[],
+		buildingsList: Building[],
+		recipesList: Recipe[]
+	): FullGraph {
+		const productsById = new Map(productsList.map((product) => [product.id, product]));
+		const buildingsById = new Map(buildingsList.map((building) => [building.id, building]));
+		const buildingFamiliesById = createBuildingFamilies(buildingsList);
+
+		const nodes: GraphNode[] = productsList.map((product) => ({
+			id: product.id,
+			label: humanizeLabel(product.name),
+			searchText: `${product.name} ${product.id} ${product.state ?? ''}`.toLowerCase(),
+			kind: 'product',
+			state: product.state ?? null,
+			radius: NODE_RADIUS.product,
+			title: `${humanizeLabel(product.name)}${product.state ? ` (${product.state})` : ''}`,
+			iconHref: getProductIconHref(product.id)
 		}));
 
 		const edges: GraphEdge[] = [];
+		const recipeGroups = new Map<
+			string,
+			{
+				nodeId: string;
+				inputs: RecipeIO[];
+				outputs: RecipeIO[];
+				buildingIds: Set<string>;
+				buildingNames: Set<string>;
+			}
+		>();
 
-		recipes.forEach((recipe, index) => {
-			const inputs = (recipe.base?.inputs ?? []).filter(({ item_id }) =>
-				resourcesById.has(item_id)
-			);
-			const outputs = (recipe.base?.outputs ?? []).filter(({ item_id }) =>
-				resourcesById.has(item_id)
-			);
+		recipesList.forEach((recipe) => {
+			const inputs = (recipe.inputs ?? []).filter(({ product_id }) => productsById.has(product_id));
+			const outputs = (recipe.outputs ?? []).filter(({ product_id }) => productsById.has(product_id));
 
 			if (!inputs.length && !outputs.length) return;
 
-			const buildingName = buildingsById.get(recipe.machine_id)?.name ?? recipe.machine_id;
-			const primaryOutput = outputs[0]?.item_id
-				? resourcesById.get(outputs[0].item_id)?.name
+			const machineId = recipe.machine?.[0] ?? 'unassigned';
+			const family = buildingFamiliesById.get(machineId);
+			const familyId = family?.familyId ?? machineId;
+			const groupKey = `${familyId}|${recipeIoSignature(inputs)}|${recipeIoSignature(outputs)}`;
+			const existing = recipeGroups.get(groupKey);
+
+			if (existing) {
+				existing.buildingIds.add(machineId);
+				existing.buildingNames.add(buildingsById.get(machineId)?.name ?? machineId);
+				return;
+			}
+
+			recipeGroups.set(groupKey, {
+				nodeId: `recipe:${familyId}:${recipeGroups.size}`,
+				inputs,
+				outputs,
+				buildingIds: new Set([machineId]),
+				buildingNames: new Set([buildingsById.get(machineId)?.name ?? machineId])
+			});
+		});
+
+		for (const group of recipeGroups.values()) {
+			const buildingNames = [...group.buildingNames].sort((left, right) => left.localeCompare(right));
+			const buildingIds = [...group.buildingIds].sort((left, right) => left.localeCompare(right));
+			const primaryOutput = group.outputs[0]?.product_id
+				? productsById.get(group.outputs[0].product_id)?.name
 				: null;
-			const label = primaryOutput ? `${buildingName} -> ${primaryOutput}` : buildingName;
-			const recipeNodeId = `recipe:${recipe.machine_id}:${index}`;
+			const buildingLabel =
+				buildingNames.length > 1
+					? `${buildingNames[0]} +${buildingNames.length - 1}`
+					: buildingNames[0] ?? buildingIds[0];
+			const label = primaryOutput ? `${buildingLabel} -> ${humanizeLabel(primaryOutput)}` : buildingLabel;
 
 			nodes.push({
-				id: recipeNodeId,
+				id: group.nodeId,
 				label,
-				searchText: `${label} ${recipe.machine_id} ${buildingName}`.toLowerCase(),
+				searchText: `${label} ${buildingIds.join(' ')} ${buildingNames.join(' ')}`.toLowerCase(),
 				kind: 'recipe',
 				radius: NODE_RADIUS.recipe,
 				title: [
-					buildingName,
-					`Inputs: ${describeRecipeAmounts(inputs, resourcesById)}`,
-					`Outputs: ${describeRecipeAmounts(outputs, resourcesById)}`
+					`Buildings: ${buildingNames.join(', ')}`,
+					`Inputs: ${describeRecipeAmounts(group.inputs, productsById)}`,
+					`Outputs: ${describeRecipeAmounts(group.outputs, productsById)}`
 				].join('\n')
 			});
 
-			inputs.forEach((input) => {
+			group.inputs.forEach((input) => {
 				edges.push({
-					id: `${input.item_id}->${recipeNodeId}`,
-					sourceId: input.item_id,
-					targetId: recipeNodeId
+					id: `${input.product_id}->${group.nodeId}`,
+					sourceId: input.product_id,
+					targetId: group.nodeId
 				});
 			});
 
-			outputs.forEach((output) => {
+			group.outputs.forEach((output) => {
 				edges.push({
-					id: `${recipeNodeId}->${output.item_id}`,
-					sourceId: recipeNodeId,
-					targetId: output.item_id
+					id: `${group.nodeId}->${output.product_id}`,
+					sourceId: group.nodeId,
+					targetId: output.product_id
 				});
 			});
-		});
+		}
 
 		const nodeMap = new Map(nodes.map((node) => [node.id, node]));
 		const outgoing = new Map<string, string[]>();
@@ -244,11 +350,7 @@
 
 		const visibleIds = new Set<string>([rootId]);
 		const upstreamIds = traverseNeighborhood(rootId, fullGraph.incoming, baseDepth + upstreamDepth);
-		const downstreamIds = traverseNeighborhood(
-			rootId,
-			fullGraph.outgoing,
-			baseDepth + downstreamDepth
-		);
+		const downstreamIds = traverseNeighborhood(rootId, fullGraph.outgoing, baseDepth + downstreamDepth);
 
 		for (const id of upstreamIds) visibleIds.add(id);
 		for (const id of downstreamIds) visibleIds.add(id);
@@ -300,39 +402,30 @@
 	}
 
 	const fullGraph = $derived.by(() =>
-		database
-			? createGraphData(database.resources ?? [], database.buildings ?? [], database.recipes ?? [])
-			: null
+		createGraphData(products, buildings, recipes)
 	);
 
 	const selectedNode = $derived(
 		selectedNodeId && fullGraph ? (fullGraph.nodeMap.get(selectedNodeId) ?? null) : null
 	);
 	const searchResults = $derived.by(() => {
-		if (!fullGraph) return [] as GraphNode[];
 		const query = search.trim().toLowerCase();
 		const nodes = fullGraph.nodes;
 		if (!query) {
-			return nodes.filter((node) => node.kind === 'resource').slice(0, 12);
+			return nodes.filter((node) => node.kind === 'product').slice(0, 12);
 		}
 
 		return nodes
 			.filter((node) => node.searchText.includes(query))
 			.sort((a, b) => {
-				if (a.kind !== b.kind) return a.kind === 'resource' ? -1 : 1;
+				if (a.kind !== b.kind) return a.kind === 'product' ? -1 : 1;
 				return a.label.localeCompare(b.label);
 			})
 			.slice(0, 12);
 	});
 
 	const visibleGraph = $derived(
-		createVisibleGraph(
-			fullGraph,
-			selectedNodeId,
-			hopDepth,
-			upstreamExtraDepth,
-			downstreamExtraDepth
-		)
+		createVisibleGraph(fullGraph, selectedNodeId, hopDepth, upstreamExtraDepth, downstreamExtraDepth)
 	);
 
 	function selectNode(id: string) {
@@ -368,23 +461,6 @@
 
 		return d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended);
 	}
-
-	async function loadDatabase() {
-		try {
-			const response = await fetch('/coi_master_db.json');
-			if (!response.ok) {
-				throw new Error(`Failed to load graph data: ${response.status}`);
-			}
-
-			database = await response.json();
-		} catch (error) {
-			errorMessage = error instanceof Error ? error.message : 'Failed to render graph.';
-		}
-	}
-
-	onMount(() => {
-		void loadDatabase();
-	});
 
 	$effect(() => {
 		if (!svgElement) return;
@@ -452,10 +528,7 @@
 				'charge',
 				d3.forceManyBody().strength((d: GraphNode) => (d.kind === 'recipe' ? -130 : -260))
 			)
-			.force(
-				'collision',
-				d3.forceCollide().radius((d: GraphNode) => d.radius + 8)
-			)
+			.force('collision', d3.forceCollide().radius((d: GraphNode) => d.radius + 8))
 			.force('center', d3.forceCenter(width / 2, height / 2));
 
 		const link = g
@@ -489,12 +562,12 @@
 		node
 			.append('circle')
 			.attr('r', (d: GraphNode) => d.radius)
-			.attr('fill', (d: GraphNode) => (d.kind === 'resource' ? RESOURCE_FILL : RECIPE_FILL))
+			.attr('fill', (d: GraphNode) => (d.kind === 'product' ? PRODUCT_FILL : RECIPE_FILL))
 			.attr('stroke', (d: GraphNode) => (d.id === selectedNodeId ? '#0f172a' : '#f8fafc'))
 			.attr('stroke-width', (d: GraphNode) => (d.id === selectedNodeId ? 3 : 1.5));
 
 		node
-			.filter((d: GraphNode) => d.kind === 'resource')
+			.filter((d: GraphNode) => d.kind === 'product')
 			.append('image')
 			.attr('href', (d: GraphNode) => d.iconHref ?? '')
 			.attr('x', (d: GraphNode) => -d.radius + 4)
@@ -520,10 +593,7 @@
 				.attr('x1', (d: GraphLink) => edgeEndpoint(d.source as GraphNode, d.target as GraphNode).x1)
 				.attr('y1', (d: GraphLink) => edgeEndpoint(d.source as GraphNode, d.target as GraphNode).y1)
 				.attr('x2', (d: GraphLink) => edgeEndpoint(d.source as GraphNode, d.target as GraphNode).x2)
-				.attr(
-					'y2',
-					(d: GraphLink) => edgeEndpoint(d.source as GraphNode, d.target as GraphNode).y2
-				);
+				.attr('y2', (d: GraphLink) => edgeEndpoint(d.source as GraphNode, d.target as GraphNode).y2);
 
 			node.attr('transform', (d: GraphNode) => `translate(${d.x ?? 0},${d.y ?? 0})`);
 		});
@@ -538,7 +608,7 @@
 	<div class="border-b border-gray-200 bg-white px-4 py-6 sm:px-6 lg:px-8">
 		<h1 class="text-3xl font-bold text-gray-900">Graph Explorer</h1>
 		<p class="mt-2 max-w-3xl text-sm text-gray-600">
-			Search for a resource or recipe, then explore only its local upstream and downstream
+			Search for a product or recipe, then explore only its local upstream and downstream
 			neighborhood.
 		</p>
 
@@ -553,7 +623,7 @@
 				<input
 					id="graph-search"
 					bind:value={search}
-					placeholder="Search resources or recipes..."
+					placeholder="Search products or recipes..."
 					class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm ring-0 outline-none placeholder:text-gray-400 focus:border-blue-500"
 				/>
 
@@ -581,7 +651,7 @@
 						<div class="mt-2 text-sm font-semibold text-gray-900">{selectedNode.label}</div>
 						<div class="mt-1 font-mono text-xs text-gray-500">{selectedNode.id}</div>
 						<div class="mt-2 text-xs text-gray-600">
-							{selectedNode.kind === 'resource' ? (selectedNode.state ?? 'Resource') : 'Recipe'}
+							{selectedNode.kind === 'product' ? (selectedNode.state ?? 'Product') : 'Recipe'}
 						</div>
 					{:else}
 						<div class="mt-2 text-sm text-gray-500">Choose a node to begin.</div>
@@ -682,18 +752,14 @@
 	</div>
 
 	<div class="relative flex-1 overflow-hidden bg-gray-50">
-		{#if errorMessage}
-			<div class="flex h-full items-center justify-center px-6 text-sm text-red-700">
-				{errorMessage}
-			</div>
-		{:else if !selectedNodeId}
+		{#if !selectedNodeId}
 			<div class="flex h-full items-center justify-center px-6">
 				<div
 					class="max-w-md rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-8 text-center shadow-sm"
 				>
 					<h2 class="text-lg font-semibold text-gray-900">Select a starting node</h2>
 					<p class="mt-2 text-sm text-gray-600">
-						Use search to pick a resource or recipe. The graph will render only the relevant
+						Use search to pick a product or recipe. The graph will render only the relevant
 						neighbors around that node.
 					</p>
 				</div>

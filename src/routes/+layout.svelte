@@ -8,7 +8,7 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<div class="flex h-full flex-col">
+<div class="flex h-full flex-col bg-gray-50 text-gray-900">
 	<TopMenu />
 	<div class="flex-1 overflow-auto">
 		{@render children()}

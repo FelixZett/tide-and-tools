@@ -1,6 +1,8 @@
 <svelte:options runes={false} />
 
 <script lang="ts">
+	import { getProductIconHref } from '$lib/coi-data';
+
 	type FoodCategory = 'Carbs' | 'Protein' | 'Vitamins' | 'Treats';
 	type MedicalLevel = 'none' | 'medical1' | 'medical2' | 'medical3';
 	type HousingTier = 'I' | 'II' | 'III' | 'IV';
@@ -24,21 +26,21 @@
 	};
 
 	const icon = {
-		food: '/settlement-icons/24px-FoodProduction.png',
-		electricity: '/settlement-icons/electricity.svg',
-		water: '/settlement-icons/water.svg',
-		wasteWater: '/settlement-icons/wastewater.svg',
-		householdGoods: '/settlement-icons/household-goods.svg',
-		waste: '/settlement-icons/24px-Waste.png',
-		biomass: '/settlement-icons/24px-Biomass.png',
-		recyclables: '/settlement-icons/24px-Recyclables.png',
-		computing: '/settlement-icons/24px-Computing.png',
-		consumerElectronics: '/settlement-icons/24px-ConsumerElectronics.png',
-		householdAppliances: '/settlement-icons/24px-HouseholdAppliances.png',
-		luxuryGoods: '/settlement-icons/24px-LuxuryGoods.png',
-		medical1: '/settlement-icons/24px-MedicalSupplies.png',
-		medical2: '/settlement-icons/24px-MedicalSupplies2.png',
-		medical3: '/settlement-icons/24px-MedicalSupplies3.png'
+		food: getProductIconHref('product_food_pack'),
+		electricity: getProductIconHref('product_virtual_electricity'),
+		water: getProductIconHref('product_water'),
+		wasteWater: getProductIconHref('product_waste_water'),
+		householdGoods: getProductIconHref('product_household_goods'),
+		waste: getProductIconHref('product_waste'),
+		biomass: getProductIconHref('product_biomass'),
+		recyclables: getProductIconHref('product_recyclables'),
+		computing: getProductIconHref('product_virtual_computing'),
+		consumerElectronics: getProductIconHref('product_consumer_electronics'),
+		householdAppliances: getProductIconHref('product_household_appliances'),
+		luxuryGoods: getProductIconHref('product_luxury_goods'),
+		medical1: getProductIconHref('product_medical_supplies'),
+		medical2: getProductIconHref('product_medical_supplies2'),
+		medical3: getProductIconHref('product_medical_supplies3')
 	} as const;
 
 	const foods: FoodDef[] = [
@@ -47,48 +49,48 @@
 			name: 'Potato',
 			category: 'Carbs',
 			baseDemandA: 4.2,
-			icon: '/settlement-icons/24px-Potato.png'
+			icon: getProductIconHref('product_potato')
 		},
-		{ key: 'corn', name: 'Corn', category: 'Carbs', baseDemandA: 3.0, icon: '/settlement-icons/24px-Corn.png' },
+		{ key: 'corn', name: 'Corn', category: 'Carbs', baseDemandA: 3.0, icon: getProductIconHref('product_corn') },
 		{
 			key: 'bread',
 			name: 'Bread',
 			category: 'Carbs',
 			baseDemandA: 2.0,
-			icon: '/settlement-icons/24px-Bread.png'
+			icon: getProductIconHref('product_bread')
 		},
-		{ key: 'meat', name: 'Meat', category: 'Protein', baseDemandA: 2.7, icon: '/settlement-icons/24px-Meat.png' },
-		{ key: 'eggs', name: 'Eggs', category: 'Protein', baseDemandA: 3.0, icon: '/settlement-icons/24px-Eggs.png' },
-		{ key: 'tofu', name: 'Tofu', category: 'Protein', baseDemandA: 1.8, icon: '/settlement-icons/24px-Tofu.png' },
+		{ key: 'meat', name: 'Meat', category: 'Protein', baseDemandA: 2.7, icon: getProductIconHref('product_meat') },
+		{ key: 'eggs', name: 'Eggs', category: 'Protein', baseDemandA: 3.0, icon: getProductIconHref('product_eggs') },
+		{ key: 'tofu', name: 'Tofu', category: 'Protein', baseDemandA: 1.8, icon: getProductIconHref('product_tofu') },
 		{
 			key: 'sausage',
 			name: 'Sausage',
 			category: 'Protein',
 			baseDemandA: 3.35,
-			icon: '/settlement-icons/24px-Sausage.png'
+			icon: getProductIconHref('product_sausage')
 		},
 		{
 			key: 'vegetables',
 			name: 'Vegetables',
 			category: 'Vitamins',
 			baseDemandA: 4.2,
-			icon: '/settlement-icons/24px-Vegetables.png'
+			icon: getProductIconHref('product_vegetables')
 		},
 		{
 			key: 'fruit',
 			name: 'Fruit',
 			category: 'Vitamins',
 			baseDemandA: 3.15,
-			icon: '/settlement-icons/24px-Fruit.png'
+			icon: getProductIconHref('product_fruit')
 		},
 		{
 			key: 'snack',
 			name: 'Snack',
 			category: 'Treats',
 			baseDemandA: 2.6,
-			icon: '/settlement-icons/24px-Snack.png'
+			icon: getProductIconHref('product_snack')
 		},
-		{ key: 'cake', name: 'Cake', category: 'Treats', baseDemandA: 2.5, icon: '/settlement-icons/24px-Cake.png' }
+		{ key: 'cake', name: 'Cake', category: 'Treats', baseDemandA: 2.5, icon: getProductIconHref('product_cake') }
 	];
 
 	const tierDemandMultipliers: Record<
@@ -375,11 +377,17 @@
 	<div
 		class="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-amber-50 p-6 shadow-sm"
 	>
-		<img
-			src="/settlement-icons/360px-Population_Overview.png"
-			alt=""
-			class="pointer-events-none absolute -right-8 -top-16 hidden w-56 opacity-25 lg:block"
-		/>
+		<div class="pointer-events-none absolute -right-6 -top-8 hidden lg:block">
+			<div class="grid gap-3 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-xl backdrop-blur">
+				<img src={getProductIconHref('product_food_pack')} alt="" class="h-12 w-12 rounded-2xl bg-white p-2" />
+				<img
+					src={getProductIconHref('product_virtual_electricity')}
+					alt=""
+					class="h-12 w-12 rounded-2xl bg-white p-2"
+				/>
+				<img src={getProductIconHref('product_waste_water')} alt="" class="h-12 w-12 rounded-2xl bg-white p-2" />
+			</div>
+		</div>
 		<div class="relative">
 			<h1 class="text-3xl font-bold text-gray-900">Settlement Calculator</h1>
 			<p class="mt-2 max-w-2xl text-gray-600">
